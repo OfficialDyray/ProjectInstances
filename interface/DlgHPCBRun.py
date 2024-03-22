@@ -101,10 +101,6 @@ class DlgHPCBRun(DlgHPCBRun_Base):
                 parent=parent_item, text=labels[sheet], data=sheet
             )
 
-            if (self.treeApplyTo.GetCount()==0):
-                parent_item: wx.TreeListItem = (sheet.parent.list_ref or self.treeApplyTo.GetRootItem())
-                item: wx.TreeListItem = self.treeApplyTo.AppendItem(parent=parent_item, text=row_text, data=sheet)
-
             # Add the sheet to the tree, in case it is a future parent:
             sheet.list_ref = item
 
