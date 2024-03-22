@@ -289,7 +289,7 @@ def find_or_set_net(board: pcbnew.BOARD, net: pcbnew.NETINFO_ITEM):
 
     nets = board.GetNetInfo()
     net.SetNetCode(nets.GetNetCount())
-    nets.AppendNet(net)
+    # nets.AppendNet(net)
     return net
 
 
