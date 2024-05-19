@@ -1,0 +1,3 @@
+[submodule "src/kiutils"]
+	path = src/kiutils
+	url = https://github.com/mvnmgrx/kiutils.git
