@@ -65,14 +65,14 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         self.hD = hD
 
         #Create the root or else our first added layout will be
-        self.treeApplyTo.AddRoot(
+        rootItem = self.treeApplyTo.AddRoot(
             text=""
         )
         
         for sheet in hD.root_sheet.tree_iter(skip_root=True):
             # Look up the parent, if it is in the tree already.
             parent_item: wx.TreeListItem = (
-                sheet.parent.list_ref or self.treeApplyTo.GetRootItem()
+                sheet.parent.list_ref or rootItem
             )
 
             # If the sheet has a PCB, mention it in the appropriate column:
