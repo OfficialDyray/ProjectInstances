@@ -115,10 +115,10 @@ sexp <<= string_ | sexpList
 # See: https://dev-docs.kicad.org/en/file-formats/sexpr-schematic/
 
 def clean_single_lists(myList):
-    if len(myList)>1:
-        return myList
-    else:
+    if len(myList)<2:
         return clean_single_lists(myList[0])
+    return myList
+        
 
 def sch_traverse(propertyList):
 
