@@ -10,6 +10,8 @@ from .cfgman import ConfigMan
 import pcbnew
 import wx
 
+from .simpleSchParser import sch_parse_file
+
 logger = logging.getLogger("hierpcb")
 
 
@@ -17,7 +19,10 @@ SchPath = Tuple[str, ...]
 
 FootprintID = str  # Unique id for a footprint across all sub-schematics.
 
-
+# A class to store
+# pcbnew.BOARD
+# validAnchors: {identifier: UUID path}
+# selected anchor
 class PCBRoom:
     """Holds the data for a 'room' in the PCB layout, correponding to the layout for a schematic sheet."""
 
@@ -121,13 +126,6 @@ class SchSheet:
         self.list_ref: Optional[wx.TreeListItem] = None
         self.checked: bool = False
 
-    def set_metadata(self, file: Path, name: str) -> None:
-        self.file = file
-        self.name = name
-
-    def has_metadata(self):
-        return self.file is not None and self.name is not None
-
     def get(self, key: SchPath, create=False) -> "SchSheet":
         """Get a sheet by its key."""
         # If the key is empty, we are done.
@@ -163,14 +161,6 @@ class SchSheet:
         for child in self.children.values():
             child.set_checked_default(child, self.checked or ancestor_checked)
 
-    def cleanup_checked(self, ancestor_checked: bool = False):
-        """Make sure that there are no paths from the root that include more than one checked sheet."""
-        if ancestor_checked:
-            self.checked = False
-        # Recur on the children:
-        for child in self.children.values():
-            child.set_checked_default(child, self.checked or ancestor_checked)
-
     @property
     def identifier(self) -> str:
         if self.parent is None:
@@ -198,6 +188,81 @@ class SchSheet:
             for line in c_str[1:]:
                 rv.append(f"│  {line}")
         return "\n".join(rv)
+
+
+# MainSchData:
+#   Parse functions
+#   UUID
+#   [UsableSubsheets]
+
+class BaseSchData():
+    def __init__(self, baseBoard: pcbnew.BOARD):
+        
+        if type(baseBoard) != pcbnew.BOARD:
+            raise ValueError("Didn't get type: pcbnew.BOARD")
+
+        self._board = baseBoard
+
+        schematicPath = Path(baseBoard.GetFileName())
+
+        if not schematicPath.exists():
+            raise FileNotFoundError("Base Board Sch. not found: " + str(schematicPath))
+
+        schematicPath = schematicPath.resolve()
+        self.parsedSchematic = sch_parse_file(schematicPath)
+        
+        tempDict = {}
+        for subSheet in self.parsedSchematic["sheet"]:
+            tempDict.setdefault(subSheet.fileName.value, [])
+            
+            subPcbFile = schematicPath.parent / Path(subSheet.fileName.value)
+
+            tempDict[subPcbFile].append(subSheet)
+
+        self._subBoards = [ SubPcb(key, value) for key, value in tempDict.items() ]
+
+    def save():
+        return
+
+    @property
+    def board(self):
+        return self._board
+
+    @property
+    def subBoards(self):
+        return self._subBoards
+
+# SubSchData:
+#   Sub-sheet file as string ():
+#       pcbnew.BOARD                          # If null, no valid pcb found
+#       validAnchors: {identifier: UUID path}
+#       selectedAnchor: UUID path             # Set by using fields?
+#       pcbInstances:
+#           [instance]
+
+#   saves/loads
+#   selected anchor
+
+class SubPcb:
+    def __init__(self, path, instanceList):
+        return
+# SubPcbInstance:
+# enabled
+# UUID /Path
+# Transform
+# GroupManager
+
+# When looping through instances,
+# the sub sheet can also be provided
+
+# saves/loads the properties:
+
+#   sheet instances: bool
+
+class PcbInstances:
+
+    def replicateLayouts(self, KicadSch):
+        return
 
 
 class HierarchicalData:
@@ -244,45 +309,3 @@ def get_sheet_key_from_footprint(fp: pcbnew.FOOTPRINT) -> Optional[SchPath]:
         return None
     assert key[0] == ""
     return tuple(key[1:-1])
-
-
-def get_sheet_hierarchy(
-    board: pcbnew.BOARD, basedir: Path
-) -> Tuple[SchSheet, Dict[Path, PCBRoom]]:
-    """Infer the sheet hierarchy from footprint data.
-
-    While this should be better handled by examining the schematics, we can't yet do that in KiCad.
-    Note that this cannot find sheets that are not referenced by at least one footprint.
-    """
-
-    # None means the sheet is known not to have a PCB layout.
-    pcb_rooms: Dict[str, Optional[PCBRoom]] = {}
-    root_sheet: Optional[SchSheet] = SchSheet("", None)
-
-    for fp in board.GetFootprints():
-        key = get_sheet_key_from_footprint(fp)
-        # Skip unknown sheets.
-        if key is None:
-            continue
-        # Get the sheet for this footprint, creating it if necessary.
-        curr_sheet = root_sheet.get(key, create=True)
-
-        if not curr_sheet.has_metadata():
-            try:
-                sheet_file = Path(fp.GetSheetfile())
-                sheet_name = fp.GetSheetname()
-            except KeyError:
-                logger.debug(f"No Sheetfile for {fp.GetReference()}, skipping.")
-                continue
-
-            curr_sheet.set_metadata(sheet_file, sheet_name)
-
-            if sheet_file not in pcb_rooms:
-                # If it is not known if the sheet_file does not have an associated PCB layout,
-                # then we look for one.
-                pcb_file = basedir / sheet_file.with_suffix(".kicad_pcb")
-                pcb_rooms[sheet_file] = PCBRoom(pcb_file) if pcb_file.exists() else None
-
-            curr_sheet.pcb = pcb_rooms[sheet_file]
-
-    return root_sheet, {k: v for k, v in pcb_rooms.items() if v is not None}
