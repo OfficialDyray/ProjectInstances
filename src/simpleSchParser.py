@@ -49,7 +49,7 @@ BNF reference: http://theory.lcs.mit.edu/~rivest/sexp.txt
 # ------------------------Start of my imports-------------------------
 #
 
-from pathlib import PurePath
+from pathlib import Path
 
 #
 # ------------------------End of my imports-------------------------
@@ -120,7 +120,7 @@ def clean_single_lists(myList):
     return myList
         
 
-def sch_traverse(propertyList):
+def sch_list_to_dict(propertyList):
 
     buildingDict = {}
 
@@ -129,12 +129,12 @@ def sch_traverse(propertyList):
         # the first item in each list is the keyword used for matching
         match x.pop(0):
             case "kicad_sch":
-                return sch_traverse(x)
+                return sch_list_to_dict(x)
 
             case "sheet":
                 buildingDict.setdefault("sheet", [])
 
-                sheetDict = sch_traverse(x)
+                sheetDict = sch_list_to_dict(x)
                 buildingDict["sheet"].append(sheetDict)
 
             case "property":
@@ -152,23 +152,36 @@ def sch_traverse(propertyList):
 
     return buildingDict
 
-    
-class kicadSchematic:
-    def __init__(self, schematicFile: PurePath):
-        if not isinstance(schematicFile, PurePath) :
-            raise ValueError
-        if not schematicFile.exists():
-            raise FileNotFoundError
-        
-        self.__file = schematicFile
-        with open(schematicFile, "r") as file:
-            parsedList = sexp.parseString(file.read())
-        
-        self.__schDict = sch_traverse(parsedList)
-        
-    def get_subsch(self):
-        return [ x for x in self.__schDict["sheet"]]
 
-    def get_subsheet_files(self):
-        return set([x["property"]["Sheetfile"] for x in self.get_sheets()])
+def sch_parse_file(schematicFile: Path) -> dict:
+
+    if not isinstance(schematicFile, Path) :
+        raise ValueError("Path not given")
+    if not schematicFile.exists():
+        raise FileNotFoundError("Path not found: " + str(schematicFile))
+
+    with open(self._path, "r") as file:
+        parsedList = sexp.parseString(file.read())
     
+    return sch_list_to_dict(parsedList)
+    def __init__(self, parentSch, sourceDict: dict):
+
+        self._uuid = sourceDict.get("uuid")
+        self._name = sourceDict.get("property", {}).get("Sheetname")
+
+        relPath = sourceDict.get("property", {}).get("Sheetfile")
+        self._path = parentSch.dir / relPath
+        self._dir = self._path.parent
+
+        if not isinstance(self._path, Path) :
+            raise Exception("Invalid Sch Path: " + str(self._path))
+        if not self._path.exists():
+            raise FileNotFoundError("File Not found: " + str(self._path))
+    
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def subsheets(self):
+        return []

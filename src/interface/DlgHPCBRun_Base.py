@@ -33,7 +33,7 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 		self.m_staticline1 = wx.StaticLine( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
 		bSizerMain.Add( self.m_staticline1, 0, wx.EXPAND |wx.ALL, 5 )
 
-		self.m_treeListCtrl1 = wx.dataview.TreeListCtrl( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.dataview.TL_CHECKBOX )
+		self.m_treeListCtrl1 = wx.dataview.TreeListCtrl( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.dataview.TL_3STATE|wx.dataview.TL_CHECKBOX )
 		self.m_treeListCtrl1.AppendColumn( u"Column1", wx.COL_WIDTH_DEFAULT, wx.ALIGN_LEFT, wx.COL_RESIZABLE )
 
 		bSizerMain.Add( self.m_treeListCtrl1, 1, wx.EXPAND |wx.ALL, 5 )
