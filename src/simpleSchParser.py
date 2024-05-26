@@ -55,7 +55,8 @@ from pathlib import Path
 # ------------------------End of my imports-------------------------
 #
 
-import pyparsing as pp
+from . import pyparsing as pp
+#import pyparsing as pp
 from base64 import b64decode
 
 
@@ -160,28 +161,7 @@ def sch_parse_file(schematicFile: Path) -> dict:
     if not schematicFile.exists():
         raise FileNotFoundError("Path not found: " + str(schematicFile))
 
-    with open(self._path, "r") as file:
+    with open(schematicFile) as file:
         parsedList = sexp.parseString(file.read())
     
     return sch_list_to_dict(parsedList)
-    def __init__(self, parentSch, sourceDict: dict):
-
-        self._uuid = sourceDict.get("uuid")
-        self._name = sourceDict.get("property", {}).get("Sheetname")
-
-        relPath = sourceDict.get("property", {}).get("Sheetfile")
-        self._path = parentSch.dir / relPath
-        self._dir = self._path.parent
-
-        if not isinstance(self._path, Path) :
-            raise Exception("Invalid Sch Path: " + str(self._path))
-        if not self._path.exists():
-            raise FileNotFoundError("File Not found: " + str(self._path))
-    
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def subsheets(self):
-        return []

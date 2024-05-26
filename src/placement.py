@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import pcbnew
 
 from .hdata import HierarchicalData, PCBRoom, SchSheet
+from .hdata import PcbInstance
 
 logger = logging.getLogger("hierpcb")
 
@@ -90,13 +91,15 @@ GroupMoverType = Callable[[pcbnew.BOARD_ITEM], bool]
 
 
 class GroupManager:
-    def __init__(self, board: pcbnew.BOARD) -> None:
+    def __init__(self, board: pcbnew.BOARD, groupName: str) -> None:
         self.board: pcbnew.board = board
         self.groups: Dict[str, pcbnew.PCB_GROUP] = {
             g.GetName(): g for g in board.Groups()
         }
 
-    def create_or_get(self, group_name: str) -> pcbnew.PCB_GROUP:
+        self._create_or_get(groupName)
+
+    def _create_or_get(self, group_name: str) -> pcbnew.PCB_GROUP:
         """Get a group by name, creating it if it doesn't exist."""
         group = self.groups.get(group_name)
         if group is None:

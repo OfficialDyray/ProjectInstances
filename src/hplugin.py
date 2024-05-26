@@ -10,9 +10,9 @@ import pcbnew
 import wx
 
 from .cfgman import ConfigMan
-from .hdata import HierarchicalData
-from .interface import DlgHPCBRun
-from .placement import enforce_position
+from .hdata import BaseSchData
+#from .interface import DlgHPCBRun
+#from .placement import enforce_position
 
 logger = logging.getLogger("hierpcb")
 logger.setLevel(logging.DEBUG)
@@ -50,7 +50,8 @@ class HierarchicalPCBPlugin(pcbnew.ActionPlugin):
         )
 
         with ConfigMan(Path(parentBoard.GetFileName() + ".hierpcb.json")) as cfg:
-            RunActual(cfg, wx_frame, parentBoard)
+            pass
+            #RunActual(cfg, wx_frame, parentBoard)
 
 
 def RunActual(cfg: ConfigMan, wx_frame: wx.Window):
