@@ -11,7 +11,7 @@ import wx
 
 from .cfgman import ConfigMan
 from .hdata import BaseSchData
-#from .interface import DlgHPCBRun
+from .interface import DlgHPCBRun
 #from .placement import enforce_position
 
 logger = logging.getLogger("hierpcb")
@@ -41,7 +41,7 @@ class HierarchicalPCBPlugin(pcbnew.ActionPlugin):
         for lH in list(logger.handlers):
             logger.removeHandler(lH)
         logger.addHandler(
-            logging.FileHandler(filename=parentBoard.GetFileName() + ".hierpcb.log", mode="w")
+            logging.FileHandler(filename=pcbnew.GetBoard().GetFileName() + ".hierpcb.log", mode="w")
         )
 
         # set up logger
@@ -49,20 +49,16 @@ class HierarchicalPCBPlugin(pcbnew.ActionPlugin):
             f"Plugin v{self.version} running on KiCad {pcbnew.GetBuildVersion()} and Python {sys.version} on {sys.platform}."
         )
 
-        with ConfigMan(Path(parentBoard.GetFileName() + ".hierpcb.json")) as cfg:
-            pass
-            #RunActual(cfg, wx_frame, parentBoard)
+        with ConfigMan(Path(pcbnew.GetBoard().GetFileName() + ".hierpcb.json")) as cfg:
+            RunActual(cfg, wx_frame)
 
 
-def RunActual(cfg: ConfigMan, wx_frame: wx.Window):
-    hD = HierarchicalData()
-    logger.debug(str(hD.root_sheet))
-    for room in hD.pcb_rooms.values():
-        logger.debug(str(room))
-    hD.load(cfg)  # Load defaults
+def RunActual(cfg, wx_frame: wx.Window):
 
-    if DlgHPCBRun(cfg, wx_frame, hD).ShowModal() == wx.ID_OK:
-        enforce_position(hD)
+    schData = BaseSchData(pcbnew.GetBoard())
+    schData.load(cfg)
 
-        hD.save(cfg)
+    if DlgHPCBRun(wx_frame, schData).ShowModal() == wx.ID_OK:
+        schData.save(cfg)
+        schData.replicate()
         logger.info("Saved.")

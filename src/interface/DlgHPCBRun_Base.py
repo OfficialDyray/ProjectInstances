@@ -24,32 +24,27 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 
 		bSizerMain = wx.BoxSizer( wx.VERTICAL )
 
-		bSizerMain.SetMinSize( wx.Size( -1,600 ) )
 		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Choose which sub-PCB layouts to apply:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText1.Wrap( -1 )
 
 		bSizerMain.Add( self.m_staticText1, 0, wx.ALL, 5 )
 
-		self.m_staticline1 = wx.StaticLine( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
-		bSizerMain.Add( self.m_staticline1, 0, wx.EXPAND |wx.ALL, 5 )
+		self.treeApplyTo = wx.dataview.TreeListCtrl( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.dataview.TL_3STATE|wx.dataview.TL_CHECKBOX )
+		self.treeApplyTo.AppendColumn( u"Column1", wx.COL_WIDTH_DEFAULT, wx.ALIGN_LEFT, 0 )
 
-		self.m_treeListCtrl1 = wx.dataview.TreeListCtrl( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.dataview.TL_3STATE|wx.dataview.TL_CHECKBOX )
-		self.m_treeListCtrl1.AppendColumn( u"Column1", wx.COL_WIDTH_DEFAULT, wx.ALIGN_LEFT, wx.COL_RESIZABLE )
+		bSizerMain.Add( self.treeApplyTo, 1, wx.ALL|wx.EXPAND, 5 )
 
-		bSizerMain.Add( self.m_treeListCtrl1, 1, wx.EXPAND |wx.ALL, 5 )
+		self.m_staticText3 = wx.StaticText( self, wx.ID_ANY, u"Select Anchor", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText3.Wrap( -1 )
 
-		self.m_staticline21 = wx.StaticLine( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
-		bSizerMain.Add( self.m_staticline21, 0, wx.EXPAND |wx.ALL, 5 )
+		bSizerMain.Add( self.m_staticText3, 0, wx.ALL|wx.EXPAND|wx.RIGHT, 5 )
 
-		m_comboBox3Choices = [ u"R1", u"R2", u"R3" ]
-		self.m_comboBox3 = wx.ComboBox( self, wx.ID_ANY, u"R2", wx.DefaultPosition, wx.DefaultSize, m_comboBox3Choices, 0 )
-		self.m_comboBox3.SetSelection( 1 )
-		self.m_comboBox3.SetMinSize( wx.Size( 1000,-1 ) )
+		anchorChoiceChoices = []
+		self.anchorChoice = wx.Choice( self, wx.ID_ANY, wx.DefaultPosition, wx.Size( -1,-1 ), anchorChoiceChoices, 0 )
+		self.anchorChoice.SetSelection( 0 )
+		self.anchorChoice.SetMinSize( wx.Size( 999999,-1 ) )
 
-		bSizerMain.Add( self.m_comboBox3, 0, wx.ALL, 5 )
-
-		self.m_staticline211 = wx.StaticLine( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL )
-		bSizerMain.Add( self.m_staticline211, 0, wx.EXPAND |wx.ALL, 5 )
+		bSizerMain.Add( self.anchorChoice, 0, wx.ALL, 5 )
 
 		m_sdbSizer1 = wx.StdDialogButtonSizer()
 		self.m_sdbSizer1Apply = wx.Button( self, wx.ID_APPLY )
@@ -70,6 +65,9 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 		self.Centre( wx.BOTH )
 
 		# Connect Events
+		self.treeApplyTo.Bind( wx.dataview.EVT_TREELIST_ITEM_CHECKED, self.handleTreeCheck )
+		self.treeApplyTo.Bind( wx.dataview.EVT_TREELIST_SELECTION_CHANGED, self.handleSelectionChange )
+		self.anchorChoice.Bind( wx.EVT_CHOICE, self.handleAnchorChange )
 		self.m_sdbSizer1Apply.Bind( wx.EVT_BUTTON, self.handleApply )
 
 	def __del__( self ):
@@ -77,5 +75,14 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 
 
 	# Virtual event handlers, override them in your derived class
+	def handleTreeCheck( self, event ):
+		event.Skip()
+
+	def handleSelectionChange( self, event ):
+		event.Skip()
+
+	def handleAnchorChange( self, event ):
+		event.Skip()
+
 	def handleApply( self, event ):
 		event.Skip()

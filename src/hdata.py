@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
 
-#from .cfgman import ConfigMan
+from .cfgman import ConfigMan
 from .simpleSchParser import sch_parse_file
-from .placement import GroupManager, PositionTransform
+from .placement import *
 
 import pcbnew
 import wx
@@ -40,8 +40,8 @@ class BaseSchData():
         
         sheetsByPcb = self._order_sheets_by_pcb(self.parsedSchematic["sheet"])
 
-        self._subBoards = [ SubPcb(self, pcbPath, sheets) for pcbPath, sheets in sheetsByPcb.items()]
-
+        self._subBoards = { pcbPath : SubPcb(self, pcbPath, sheets) for pcbPath, sheets in sheetsByPcb.items()}
+        print(self._subBoards)
 
     def _order_sheets_by_pcb(self, sheetList):
         tempDict = {}
@@ -61,10 +61,32 @@ class BaseSchData():
     def subBoards(self):
         return self._subBoards
 
+    def save(self, cfg: ConfigMan):
+        for subBoard in self.subBoards.values():
+            enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
+            boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
+            cfg.set(subBoard._name, value=boardData)
+
+    def load(self, cfg: ConfigMan):
+        for subBoard in self.subBoards.values():
+            boardData = cfg.get(subBoard._name)
+            if not boardData:
+                print("boardData empty")
+                # Add error output
+                continue
+            subBoard.selectedAnchor = boardData.get("selAnchor")
+
+            for instance in subBoard._instances:
+                isEnabled = boardData.get("enabledDict").get(instance._uuid, None)
+                if isEnabled == None:
+                    print("isEnabled empty")
+                    continue
+                instance._enabled = isEnabled
+
     def replicate(self):
-        for pcb in self._subBoards:
-            #subboard valid check
-            pass     
+        for subBoard in self.subBoards.values():
+            subBoard.replicateInstances()
+
         #Fixes issues with traces lingering after being deleted
         pcbnew.Refresh()
 
@@ -83,7 +105,7 @@ class BaseSchData():
 
 class SubPcb:
     def __init__(self, mainSch, relPath, instanceList):
-
+        self._name = relPath
         schPath = mainSch._path.parent / Path(relPath)
         brdPath = schPath.with_suffix(".kicad_pcb")
 
@@ -94,14 +116,41 @@ class SubPcb:
 
         self._board = subBoard
 
-        self._validAnchors = { fp.GetPath().AsString() : fp.GetReferenceAsString() for fp in subBoard.GetFootprints() }
-        self._selectedAnchor = None #uuid of selected anchor
+        self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
+        self._selectedAnchor = self._validAnchors[0]
 
-        self.anchor = pcbnew.FOOTPRINT
+        self.anchorFootprint = subBoard.FindFootprintByReference(self.selectedAnchor)
+
+        print(self.anchorFootprint)
 
         self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
-        return
+        
 
+    def replicateInstances(self):
+        for instance in self._instances:
+            if not instance.enabled:
+                continue
+            instance.replicateLayout()
+
+    @property
+    def board(self):
+        return self._board
+
+    @property
+    def validAnchors(self):
+        return self._validAnchors
+
+    @property
+    def selectedAnchor(self):
+        return self._selectedAnchor
+    
+    @selectedAnchor.setter
+    def selectedAnchor(self, value):
+        if value in self.validAnchors:
+            self._selectedAnchor = value
+        else:
+            self._selectedAnchor = self.validAnchors[0]
+            print("Not valid anchor: " + str(value))
 
 # PcbInstance:
 # enabled
@@ -122,86 +171,54 @@ class PcbInstance():
     def __init__(self, mainSch, SubPcb, instance):
         uuid = instance["uuid"]
         self._uuid = uuid
+        self._uuidPath = "/" + uuid
 
         name = instance["property"]["Sheetname"]
-        self._name = name      
-
-        # Schematic path already in SubPcb
-        # relPath = instance["property"]["Sheetfile"]
-        # schPath = mainSch._path.parent / Path(relPath)
+        self._name = name
 
         self._mainSch = mainSch
         self._SubPcb = SubPcb
 
-        # Prepare grouper from uuid
-        self._groupManager = GroupManager(mainSch.board, uuid)
+        self._enabled = False
 
-        instanceAnchor = board.GetFootprints()[0]
+        # Prepare grouper from sheetName
+        self._groupMan = GroupManager(mainSch.board, name)
 
-        # Move items relative to anchor footprints
-        self._transformer = PositionTransform(SubPcb.anchor, instanceAnchor)
-
-        return
+    @property
+    def enabled(self):
+        return self._enabled
 
     # Gets corrosponding fp in the main schematic
     def _fpTranslator(self, subPcbFootprint: pcbnew.FOOTPRINT):
-        newPath = pcbnew.KIID_PATH(self._mainSch._path + subPcbFootprint.GetPath())
+        newPath = pcbnew.KIID_PATH(self._uuidPath + subPcbFootprint.GetPath().AsString())
         mainFootprint = self._mainSch.board.FindFootprintByPath(newPath)
         return mainFootprint
 
-    def replicateLayouts(self):
+
+    def replicateLayout(self):
         """Enforce the positions of objects in PCB template on PCB mutate."""
 
-        errors: List[ReportedError] = []
-        groupman: GroupManager = GroupManager(targetBoard)
-
         # Find the anchor footprint on the subPCB:
-        anchor_subpcb = self._SubPcb.anchor
-        anchor_target = self._fpTranslator(anchor_subpcb)
+        anchor_subpcb = self._SubPcb.anchorFootprint        
 
-        # We need to force all the footprints to be in the same group. To do that,
-        # we automatically create a group for the anchor footprint if it doesn't exist and
-        # move all the footprints into it.
-        group_name = f"subpcb_{sheet.human_path}"
-        group = groupman.create_or_get(group_name)
+        # Move items relative to anchor footprints
+        instanceAnchor = self._fpTranslator(anchor_subpcb)
+        self._transformer = PositionTransform(anchor_subpcb, instanceAnchor)
 
         # Clear Volatile items first
-        self.clear_volatile_items()
+        clear_volatile_items(self._groupMan.group)
 
         # First, move the footprints and create the net mapping:
-        err_footprints = self._enforce_position_footprints()
-        errors.extend(err_footprints)
+        self._enforce_position_footprints()
 
         # Recreate traces:
-        err_traces = self._copy_traces()
-        errors.extend(err_traces)
+        self._copy_traces()
 
         # Recreate Drawings
-        err_drawings = self._copy_drawings()
-        errors.extend(err_drawings)
+        self._copy_drawings()
 
         # Recreate Zones
-        err_zones = self._copy_zones()
-        errors.extend(err_zones)
-
-
-    def _clear_volatile_items(targetBoard: pcbnew.BOARD, group: pcbnew.PCB_GROUP):
-        """Remove all zones in a group."""
-        itemTypesToRemove = (
-            # Traces
-            pcbnew.PCB_TRACK, pcbnew.ZONE,
-            # Drawings
-            pcbnew.PCB_SHAPE, pcbnew.PCB_TEXT,
-            # Zones
-            pcbnew.ZONE
-        )
-
-        for item in group.GetItems():
-
-            # Gets all drawings in a group
-            if isinstance(item.Cast(), itemTypesToRemove):
-                # Remove every drawing
-                targetBoard.RemoveNative(item)
+        self._copy_zones()
 
 
     def _copy_footprint_fields(self,
@@ -209,7 +226,7 @@ class PcbInstance():
         targetFootprint: pcbnew.FOOTPRINT,
     ):
 
-        transform   = self._transformer
+        transform = self._transformer
 
         # NOTE: Non-center aligned Fields position changes with rotation.
         #       This is not a bug. The replicated pcbs are behaving the 
@@ -240,7 +257,7 @@ class PcbInstance():
         targetFootprint: pcbnew.FOOTPRINT,
     ):
         
-        transform   = self._transformer
+        transform = self._transformer
 
         # Most definetly exists a better way to do this...
         # Maybe footprint cloning? 
@@ -269,8 +286,6 @@ class PcbInstance():
         targetBoard = self._mainSch.board
         transform   = self._transformer
 
-        errors = []
-
         # The keys are the sub-pcb net codes
         # The values are the new net codes
         footprintNetMapping = {}
@@ -282,15 +297,6 @@ class PcbInstance():
             targetFootprint = self._fpTranslator(sourceFootprint)
 
             if not targetFootprint:
-                errors.append(
-                    ReportedError(
-                        "footprint not found, skipping",
-                        message=f"Corresponding to {sourceFootprint.GetReference()} for sheet {sheet.human_name}",
-                        footprint=sourceFootprint,
-                        pcb=sheet.pcb,
-                        level=ErrorLevel.WARNING,
-                    )
-                )
                 continue
 
             # Copy the properties and move the template to the target:
@@ -308,18 +314,9 @@ class PcbInstance():
                 footprintNetMapping[sourceCode] = targetCode
 
             # Move the footprint into the group if one is provided:
-            if groupmv(targetFootprint):
-                errors.append(
-                    ReportedError(
-                        f"footprint {targetFootprint} is in the wrong group",
-                        pcb=sheet.pcb,
-                        level=ErrorLevel.ERROR,
-                    )
-                )
+            self._groupMan.move(targetFootprint)
         
         self._footprintNetMapping = footprintNetMapping
-        
-        return errors
 
 
     def _copy_traces(self):
@@ -327,8 +324,8 @@ class PcbInstance():
         sourceBoard = self._SubPcb.board
         targetBoard = self._mainSch.board
         transform   = self._transformer
+        footprintNetMapping = self._footprintNetMapping
 
-        errors = []
         for sourceTrack in sourceBoard.Tracks():
             # Copy track to trk:
             # logger.info(f"{track} {type(track)} {track.GetStart()} -> {track.GetEnd()}")
@@ -348,9 +345,7 @@ class PcbInstance():
             if type(newTrack) == pcbnew.PCB_VIA:
                 newTrack.SetIsFree(False)
 
-            self.mover(newTrack)
-
-        return errors
+            self._groupMan.move(newTrack)
 
 
     def _copy_drawings(self):
@@ -359,7 +354,6 @@ class PcbInstance():
         targetBoard = self._mainSch.board
         transform   = self._transformer
 
-        errors = []
         for sourceDrawing in sourceBoard.GetDrawings(): 
             
             newDrawing = sourceDrawing.Duplicate()
@@ -372,9 +366,7 @@ class PcbInstance():
             # instead do a relative rotation
             newDrawing.Rotate(newDrawing.GetPosition(), transform.orient(pcbnew.ANGLE_0))
 
-            self.mover(newDrawing)
-
-        return errors
+            self._groupMan.move(newDrawing)
 
 
     def _copy_zones(self):
@@ -382,9 +374,9 @@ class PcbInstance():
         sourceBoard = self._SubPcb.board
         targetBoard = self._mainSch.board
         transform   = self._transformer
+        footprintNetMapping = self._footprintNetMapping
 
-        errors = []
-        for sourceZone in sheet.pcb.subboard.Zones():
+        for sourceZone in self._SubPcb.board.Zones():
             
             newZone = sourceZone.Duplicate()
 
@@ -407,6 +399,4 @@ class PcbInstance():
             # instead do a relative rotation
             newZone.Rotate(newZone.GetPosition(), transform.orient(pcbnew.ANGLE_0))
 
-            mover(newZone)
-
-        return errors
+            self._groupMan.move(newZone)
