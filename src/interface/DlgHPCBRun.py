@@ -9,6 +9,14 @@ from .DlgHPCBRun_Base import DlgHPCBRun_Base
 
 logger = logging.getLogger("hierpcb")
 
+def wxStateFromTri(int):
+    match int:
+        case 0:
+            return wx.CHK_UNCHECKED
+        case 1:
+            return wx.CHK_UNDETERMINED
+        case 2:
+            return wx.CHK_CHECKED
 
 class DlgHPCBRun(DlgHPCBRun_Base):
     def __init__(self, parent: wx.Window, schData: BaseSchData):
@@ -31,6 +39,8 @@ class DlgHPCBRun(DlgHPCBRun_Base):
             subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
                 parent=rootItem, text=str(subPcb._name), data=subPcb
             )
+            checkState = wxStateFromTri(subPcb.getStateFromInstances())
+            self.treeApplyTo.CheckItem(subPcbItem, checkState)
 
             for instance in subPcb._instances:
                 instanceItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
@@ -60,10 +70,18 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         objData = self.treeApplyTo.GetItemData(eventItem)
         if isinstance(objData, SubPcb):
             # Toggle all children's state
-            pass
+            state = self.treeApplyTo.GetCheckedState(eventItem)
+            self.treeApplyTo.CheckItemRecursively(eventItem, state)
+            objData.setInstancesState(state == wx.CHK_CHECKED)
+
         if isinstance(objData, PcbInstance):
             checked = self.treeApplyTo.GetCheckedState(eventItem)
             objData.enabled = (checked == wx.CHK_CHECKED)
+
+            parent = self.treeApplyTo.GetItemParent(eventItem)
+            parentSubpcb = self.treeApplyTo.GetItemData(parent)
+            checkState = wxStateFromTri(parentSubpcb.getStateFromInstances())
+            self.treeApplyTo.CheckItem(parent, checkState)
 
     def handleSelectionChange( self, event ):
         subPcb = self.getSelectedSubPCB()

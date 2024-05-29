@@ -124,6 +124,7 @@ class SubPcb:
             self._board = None
             self._validAnchors = []
             self._selectedAnchor = None
+            self._instances = []
             return
 
         subBoard = pcbnew.LoadBoard(brdPath)
@@ -133,6 +134,7 @@ class SubPcb:
             self._board = None
             self._validAnchors = []
             self._selectedAnchor = None
+            self._instances = []
             return
 
         self._board = subBoard
@@ -165,6 +167,28 @@ class SubPcb:
         
         self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)        
 
+    # Tri-state: 0- none, 1- some, 2- all
+    def getStateFromInstances(self):
+        if not self.board:
+            return 0
+        enabledCount = 0
+        instanceNum  = len(self._instances)
+
+        for instance in self._instances:
+            if instance.enabled:
+                enabledCount += 1
+
+        if enabledCount == 0:
+            return 0 # No instances enabled
+
+        if enabledCount == instanceNum:
+            return 2 # All instances enabled
+
+        return 1 # Some Instances enabled
+
+    def setInstancesState(self, checked):
+        for instance in self._instances:
+            instance.enabled = checked
 
     def replicateInstances(self):
         if not self.board:
@@ -224,7 +248,7 @@ class PcbInstance():
         if not instanceAnchor:
             return
 
-        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, instanceAnchor, self._name)
+        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, instanceAnchor, self._uuid)
 
         # Clear Volatile items first
         clear_volatile_items(replContext.group)
