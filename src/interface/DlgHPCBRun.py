@@ -56,7 +56,7 @@ class DlgHPCBRun(DlgHPCBRun_Base):
             pass
         if isinstance(objData, PcbInstance):
             checked = self.treeApplyTo.GetCheckedState(eventItem)
-            PcbInstance.enabled = (checked == 1)
+            objData.enabled = (checked == wx.CHK_CHECKED)
 
     def handleSelectionChange( self, event ):
        subPcb = self.getSelectedSubPCB()
@@ -80,7 +80,6 @@ class DlgHPCBRun(DlgHPCBRun_Base):
             return
 
         subpcb.selectedAnchor = sel_anchor
-
 
     def handleApply(self, event):
         """Submit the form."""

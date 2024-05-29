@@ -84,7 +84,6 @@ class GroupManager:
         self.board: pcbnew.BOARD = board
         self.group = self._create_or_get(groupName)
 
-
     def _create_or_get(self, group_name: str) -> pcbnew.PCB_GROUP:
         """Get a group by name, creating it if it doesn't exist."""
         retGroup = None
@@ -113,9 +112,15 @@ class GroupManager:
 
         return moved
 
-## Contains information to:
-#  MoveFootprints relative to anchor
-#  Place footprints in the group
+class FootprintTranslator:
+    def __init__(self, searchBoard, searchPrefix):
+        self._searchBoard = searchBoard
+        self._searchPrefix = searchPrefix
+
+    def getTarget(self, subPcbFootprint: pcbnew.FOOTPRINT):
+        newPath = pcbnew.KIID_PATH(self._searchPrefix + subPcbFootprint.GetPath().AsString())
+        mainFootprint = self._searchBoard.FindFootprintByPath(newPath)
+        return mainFootprint
 
 class ReplicateContext(PositionTransform, GroupManager):
     def __init__(
@@ -130,7 +135,7 @@ class ReplicateContext(PositionTransform, GroupManager):
 
         PositionTransform.__init__(self, sourceAnchorFootprint, targetAnchorFootprint)
 
-        GroupManager.__init__(self, self._sourceBoard, groupName)
+        GroupManager.__init__(self, self._targetBoard, groupName)
 
     @property
     def sourceBoard(self):
@@ -161,85 +166,11 @@ def clear_volatile_items(group: pcbnew.PCB_GROUP):
             # Remove every drawing
             board.RemoveNative(item)
 
-
-def copy_drawings(context: ReplicateContext):
-    for sourceDrawing in context.sourceBoard.GetDrawings(): 
-        
-        newDrawing = sourceDrawing.Duplicate()
-        context.targetBoard.Add(newDrawing)
-
-        # Set New Position
-        newDrawing.SetPosition(context.translate(sourceDrawing.GetPosition()))
-
-        # Drawings dont have .SetOrientation()
-        # instead do a relative rotation
-        newDrawing.Rotate(newDrawing.GetPosition(), context.orient(pcbnew.ANGLE_0))
-
-        context.move(newDrawing)
-
-
-def copy_traces(context: ReplicateContext, netMapping: dict):
-    for sourceTrack in context.sourceBoard.Tracks():
-        # Copy track to trk:
-        # logger.info(f"{track} {type(track)} {track.GetStart()} -> {track.GetEnd()}")
-        
-        newTrack = sourceTrack.Duplicate()
-        context.targetBoard.Add(newTrack)
-
-        sourceNetCode = sourceTrack.GetNetCode()
-        newNetCode = netMapping.get(sourceNetCode, 0)
-        newTrack.SetNet(context.targetBoard.FindNet(newNetCode))
-
-        # Sets Track start and end point
-        # Via's ignore the end point, just copying anyways
-        newTrack.SetStart(context.translate(sourceTrack.GetStart()))
-        newTrack.SetEnd  (context.translate(sourceTrack.GetEnd()  ))
-
-        if type(newTrack) == pcbnew.PCB_VIA:
-            newTrack.SetIsFree(False)
-
-        context.move(newTrack)
-
-
-def copy_zones(context: ReplicateContext, netMapping: dict):
-
-    transform   = self._transformer
-    groupMan    = self._groupMan
-
-    footprintNetMapping = self._footprintNetMapping
-
-    for sourceZone in context.sourceBoard.Zones():
-        
-        newZone = sourceZone.Duplicate()
-
-        sourceNetCode = sourceZone.GetNetCode()
-        newNetCode = footprintNetMapping.get(sourceNetCode, 0)
-        newZone.SetNet(context.targetBoard.FindNet(newNetCode))
-
-        context.targetBoard.Add(newZone)
-
-        # Set New Position
-        # newZone.SetPosition(transform.translate(zone.GetPosition()))
-
-        # Temporary Workaround:
-        # Move zone to 0,0 by moving relative
-        newZone.Move(-newZone.GetPosition())
-        # Move zone to correct location
-        newZone.Move(context.translate(sourceZone.GetPosition()))
-
-        # Drawings dont have .SetOrientation()
-        # instead do a relative rotation
-        newZone.Rotate(newZone.GetPosition(), context.orient(pcbnew.ANGLE_0))
-
-        context.move(newZone)
-
-
 def copy_footprint_fields(
     sourceFootprint: pcbnew.FOOTPRINT,
     targetFootprint: pcbnew.FOOTPRINT,
+    transform
 ):
-    transform = PositionTransform(sourceFootprint, targetFootprint)
-
     # NOTE: Non-center aligned Fields position changes with rotation.
     #       This is not a bug. The replicated pcbs are behaving the 
     #       exact same as the original would when rotated.
@@ -263,17 +194,12 @@ def copy_footprint_fields(
 
     targetFootprint.SetReference(originalReference)
 
-
 def copy_footprint_data(
     sourceFootprint: pcbnew.FOOTPRINT,
     targetFootprint: pcbnew.FOOTPRINT,
+    transform
 ):
-    transform = PositionTransform(sourceFootprint, targetFootprint)
-
-    copy_footprint_fields(sourceFootprint, targetFootprint)
-
-    # Most definetly exists a better way to do this...
-    # Maybe footprint cloning? 
+    # Replace with Footprint Cloning?
     if sourceFootprint.IsFlipped() != targetFootprint.IsFlipped():
         targetFootprint.Flip(targetFootprint.GetPosition(), False)
 
@@ -290,14 +216,78 @@ def copy_footprint_data(
     targetFootprint.SetPosition(transform.translate(sourceFootprint.GetPosition()))
     targetFootprint.SetOrientation(transform.orient(sourceFootprint.GetOrientation()))
 
+    # Fields must be moved after the footprint
+    copy_footprint_fields(sourceFootprint, targetFootprint, transform)
+
+def copy_drawings(context: ReplicateContext):
+    for sourceDrawing in context.sourceBoard.GetDrawings(): 
+        
+        newDrawing = sourceDrawing.Duplicate()
+        context.targetBoard.Add(newDrawing)
+
+        # Set New Position
+        newDrawing.SetPosition(context.translate(sourceDrawing.GetPosition()))
+
+        # Drawings dont have .SetOrientation()
+        # instead do a relative rotation
+        newDrawing.Rotate(newDrawing.GetPosition(), context.orient(pcbnew.ANGLE_0))
+
+        context.move(newDrawing)
+
+def copy_traces(context: ReplicateContext, netMapping: dict):
+    for sourceTrack in context.sourceBoard.Tracks():
+        # Copy track to trk:
+        # logger.info(f"{track} {type(track)} {track.GetStart()} -> {track.GetEnd()}")
+        
+        newTrack = sourceTrack.Duplicate()
+        context.targetBoard.Add(newTrack)
+
+        sourceNetCode = sourceTrack.GetNetCode()
+        newNetCode = netMapping.get(sourceNetCode, 0)
+        newTrack.SetNet(context.targetBoard.FindNet(newNetCode))
+
+        # Sets Track start and end point
+        # Via's ignore the end point, just copying anyways
+        newTrack.SetStart(context.translate(sourceTrack.GetStart()))
+        newTrack.SetEnd  (context.translate(sourceTrack.GetEnd()  ))
+
+        if type(newTrack) == pcbnew.PCB_VIA:
+            newTrack.SetIsFree(False)
+
+        context.move(newTrack)
+
+def copy_zones(context: ReplicateContext, netMapping: dict):
+
+    for sourceZone in context.sourceBoard.Zones():
+        
+        newZone = sourceZone.Duplicate()
+
+        sourceNetCode = sourceZone.GetNetCode()
+        newNetCode = netMapping.get(sourceNetCode, 0)
+        newZone.SetNet(context.targetBoard.FindNet(newNetCode))
+
+        context.targetBoard.Add(newZone)
+
+        # Set New Position
+        # newZone.SetPosition(transform.translate(zone.GetPosition()))
+
+        # Temporary Workaround:
+        # Move zone to 0,0 by moving relative
+        newZone.Move(-newZone.GetPosition())
+        # Move zone to correct location
+        newZone.Move(context.translate(sourceZone.GetPosition()))
+
+        # Drawings dont have .SetOrientation()
+        # instead do a relative rotation
+        newZone.Rotate(newZone.GetPosition(), context.orient(pcbnew.ANGLE_0))
+
+        context.move(newZone)
+
 
 def enforce_position_footprints(
     context: ReplicateContext,
-    fpTranslator
+    fpTranslator: FootprintTranslator
 ) -> dict:
-
-    fpTranslator = self._fpTranslator
-
     # The keys are the sub-pcb net codes
     # The values are the new net codes
     footprintNetMapping = {}
@@ -306,13 +296,13 @@ def enforce_position_footprints(
     for sourceFootprint in context.sourceBoard.GetFootprints():
         # Find the corresponding footprint on the board:
 
-        targetFootprint = fpTranslator(sourceFootprint)
+        targetFootprint = fpTranslator.getTarget(sourceFootprint)
 
         if not targetFootprint:
             continue
 
         # Copy the properties and move the template to the target:
-        copy_footprint_data(sourceFootprint, targetFootprint)
+        copy_footprint_data(sourceFootprint, targetFootprint, context)
 
         # Assumes pads are ordered by the pad number
         for sourcePadNum, sourcePad in enumerate(sourceFootprint.Pads()):

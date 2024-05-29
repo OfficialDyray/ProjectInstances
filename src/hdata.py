@@ -65,6 +65,7 @@ class BaseSchData():
         for subBoard in self.subBoards.values():
             enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
             boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
+            print(boardData)
             cfg.set(subBoard._name, value=boardData)
 
     def load(self, cfg: ConfigMan):
@@ -74,6 +75,9 @@ class BaseSchData():
                 print("boardData empty")
                 # Add error output
                 continue
+
+            print(boardData)
+
             subBoard.selectedAnchor = boardData.get("selAnchor")
 
             for instance in subBoard._instances:
@@ -119,9 +123,7 @@ class SubPcb:
         self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
         self._selectedAnchor = self._validAnchors[0]
 
-        self.anchorFootprint = subBoard.FindFootprintByReference(self.selectedAnchor)
-
-        print(self.anchorFootprint)
+        self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
 
         self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
         
@@ -151,6 +153,8 @@ class SubPcb:
         else:
             self._selectedAnchor = self.validAnchors[0]
             print("Not valid anchor: " + str(value))
+        
+        self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
 
 # PcbInstance:
 # enabled
@@ -181,40 +185,32 @@ class PcbInstance():
 
         self._enabled = False
 
-        # Prepare grouper from sheetName
-        self._replicateContext = 
-        self._groupMan = GroupManager(mainSch.board, name)
-
     @property
     def enabled(self):
         return self._enabled
-
-    # Gets corrosponding fp in the main schematic
-    def _fpTranslator(self, subPcbFootprint: pcbnew.FOOTPRINT):
-        newPath = pcbnew.KIID_PATH(self._uuidPath + subPcbFootprint.GetPath().AsString())
-        mainFootprint = self._mainSch.board.FindFootprintByPath(newPath)
-        return mainFootprint
-
+    
+    @enabled.setter
+    def enabled(self, value):
+        self._enabled = value
 
     def replicateLayout(self):
         """Enforce the positions of objects in PCB template on PCB mutate."""
 
-        replContext = ReplicateContext(self._SubPcb.anchorFootprint, )
+        fpTranslator = FootprintTranslator(self._mainSch.board, self._uuidPath)
 
         # Find the anchor footprint on the subPCB:
-        anchor_subpcb = self._SubPcb.anchorFootprint
+        subPcbAnchor = self._SubPcb.anchorFootprint
+        instanceAnchor = fpTranslator.getTarget(subPcbAnchor)
 
-        # Move items relative to anchor footprints
-        instanceAnchor = self._fpTranslator(anchor_subpcb)
-        self._transformer = PositionTransform(anchor_subpcb, instanceAnchor)
+        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, instanceAnchor, self._name)
 
         # Clear Volatile items first
-        clear_volatile_items(self._groupMan.group)
+        clear_volatile_items(replContext.group)
 
         # First, move the footprints and create the net mapping:
-        netMap = enforce_position_footprints()
+        netMap = enforce_position_footprints(replContext, fpTranslator)
 
         # Recreate Volatile items:
-        copy_drawings(context)
-        copy_traces  (context, netMap)
-        copy_zones   (context, netMap)
+        copy_drawings(replContext)
+        copy_traces  (replContext, netMap)
+        copy_zones   (replContext, netMap)
