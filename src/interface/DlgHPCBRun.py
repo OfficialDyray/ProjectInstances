@@ -21,6 +21,13 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         rootItem = self.treeApplyTo.GetRootItem()
         
         for subPcb in schData.subBoards.values():
+            if not subPcb.board:
+                invalidText = f"{subPcb._name} not found"
+                subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
+                    parent=rootItem, text=invalidText, data=subPcb
+                )
+                continue
+
             subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
                 parent=rootItem, text=str(subPcb._name), data=subPcb
             )
@@ -59,10 +66,11 @@ class DlgHPCBRun(DlgHPCBRun_Base):
             objData.enabled = (checked == wx.CHK_CHECKED)
 
     def handleSelectionChange( self, event ):
-       subPcb = self.getSelectedSubPCB()
-       self.anchorChoice.Clear()
-       self.anchorChoice.AppendItems(subPcb.validAnchors)
-       self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))
+        subPcb = self.getSelectedSubPCB()
+        self.anchorChoice.Clear()
+        self.anchorChoice.AppendItems(subPcb.validAnchors)
+        if subPcb.selectedAnchor in subPcb.validAnchors:
+            self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))
 
     def handleAnchorChange( self, event ):
         # Set the anchor:

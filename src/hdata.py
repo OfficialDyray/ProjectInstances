@@ -41,7 +41,6 @@ class BaseSchData():
         sheetsByPcb = self._order_sheets_by_pcb(self.parsedSchematic["sheet"])
 
         self._subBoards = { pcbPath : SubPcb(self, pcbPath, sheets) for pcbPath, sheets in sheetsByPcb.items()}
-        print(self._subBoards)
 
     def _order_sheets_by_pcb(self, sheetList):
         tempDict = {}
@@ -63,6 +62,8 @@ class BaseSchData():
 
     def save(self, cfg: ConfigMan):
         for subBoard in self.subBoards.values():
+            if not subBoard.board:
+                continue
             enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
             boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
             print(boardData)
@@ -89,6 +90,8 @@ class BaseSchData():
 
     def replicate(self):
         for subBoard in self.subBoards.values():
+            if not subBoard.board:
+                continue
             subBoard.replicateInstances()
 
         #Fixes issues with traces lingering after being deleted
@@ -109,30 +112,36 @@ class BaseSchData():
 
 class SubPcb:
     def __init__(self, mainSch, relPath, instanceList):
-        self._name = relPath
+        self._name = str(Path(relPath).with_suffix(".kicad_pcb"))
         schPath = mainSch._path.parent / Path(relPath)
         brdPath = schPath.with_suffix(".kicad_pcb")
 
         self._schPath = schPath
         self._brdPath = brdPath
 
+        if not brdPath.exists():
+            print(f"{str(brdPath)} doesn't exist")
+            self._board = None
+            self._validAnchors = []
+            self._selectedAnchor = None
+            return
+
         subBoard = pcbnew.LoadBoard(brdPath)
+            
+        if len(subBoard.GetFootprints()) < 1:
+            print(f"{str(brdPath)} Has no footprints")
+            self._board = None
+            self._validAnchors = []
+            self._selectedAnchor = None
+            return
 
         self._board = subBoard
-
         self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
         self._selectedAnchor = self._validAnchors[0]
 
         self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
 
         self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
-        
-
-    def replicateInstances(self):
-        for instance in self._instances:
-            if not instance.enabled:
-                continue
-            instance.replicateLayout()
 
     @property
     def board(self):
@@ -154,7 +163,17 @@ class SubPcb:
             self._selectedAnchor = self.validAnchors[0]
             print("Not valid anchor: " + str(value))
         
-        self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
+        self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)        
+
+
+    def replicateInstances(self):
+        if not self.board:
+            return
+        for instance in self._instances:
+            if not instance.enabled:
+                continue
+            instance.replicateLayout()
+
 
 # PcbInstance:
 # enabled
@@ -201,6 +220,9 @@ class PcbInstance():
         # Find the anchor footprint on the subPCB:
         subPcbAnchor = self._SubPcb.anchorFootprint
         instanceAnchor = fpTranslator.getTarget(subPcbAnchor)
+
+        if not instanceAnchor:
+            return
 
         replContext: ReplicateContext = ReplicateContext(subPcbAnchor, instanceAnchor, self._name)
 
