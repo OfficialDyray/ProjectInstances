@@ -38,7 +38,7 @@ class BaseSchData():
         self._path = schematicPath
         self.parsedSchematic = sch_parse_file(schematicPath)
         
-        sheetsByPcb = self._order_sheets_by_pcb(self.parsedSchematic["sheet"])
+        sheetsByPcb = self._order_sheets_by_pcb(self.parsedSchematic.get("sheet", {}))
 
         self._subBoards = { pcbPath : SubPcb(self, pcbPath, sheets) for pcbPath, sheets in sheetsByPcb.items()}
 
@@ -60,10 +60,12 @@ class BaseSchData():
     def subBoards(self):
         return self._subBoards
 
+
     def save(self, cfg: ConfigMan):
         for subBoard in self.subBoards.values():
-            if not subBoard.board:
+            if not subBoard.isValid:
                 continue
+
             enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
             boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
             print(boardData)
@@ -71,7 +73,11 @@ class BaseSchData():
 
     def load(self, cfg: ConfigMan):
         for subBoard in self.subBoards.values():
+            if not subBoard.isValid:
+                continue
+
             boardData = cfg.get(subBoard._name)
+
             if not boardData:
                 print("boardData empty")
                 # Add error output
@@ -88,9 +94,10 @@ class BaseSchData():
                     continue
                 instance._enabled = isEnabled
 
+
     def replicate(self):
         for subBoard in self.subBoards.values():
-            if not subBoard.board:
+            if not subBoard.isValid:
                 continue
             subBoard.replicateInstances()
 
@@ -121,33 +128,36 @@ class SubPcb:
 
         if not brdPath.exists():
             print(f"{str(brdPath)} doesn't exist")
-            self._board = None
-            self._validAnchors = []
-            self._selectedAnchor = None
-            self._instances = []
+            self._isValid = False
             return
 
         subBoard = pcbnew.LoadBoard(brdPath)
             
         if len(subBoard.GetFootprints()) < 1:
             print(f"{str(brdPath)} Has no footprints")
-            self._board = None
-            self._validAnchors = []
-            self._selectedAnchor = None
-            self._instances = []
+            self._isValid = False
             return
+
+        self._isValid = True
 
         self._board = subBoard
         self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
-        self._selectedAnchor = self._validAnchors[0]
+        self.selectedAnchor = self._validAnchors[0]
 
         self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
 
+        
+
         self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
+
 
     @property
     def board(self):
         return self._board
+
+    @property
+    def isValid(self):
+        return self._isValid
 
     @property
     def validAnchors(self):
@@ -156,9 +166,12 @@ class SubPcb:
     @property
     def selectedAnchor(self):
         return self._selectedAnchor
-    
+
     @selectedAnchor.setter
     def selectedAnchor(self, value):
+        if not self.isValid:
+            return
+
         if value in self.validAnchors:
             self._selectedAnchor = value
         else:
@@ -166,6 +179,7 @@ class SubPcb:
             print("Not valid anchor: " + str(value))
         
         self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)        
+
 
     # Tri-state: 0- none, 1- some, 2- all
     def getStateFromInstances(self):

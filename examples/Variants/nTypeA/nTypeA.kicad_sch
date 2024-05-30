@@ -1,0 +1,93 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "e0597968-f11c-42e6-8091-8a167b37e076")
+	(paper "A4")
+	(lib_symbols)
+	(hierarchical_label "Input"
+		(shape input)
+		(at 36.83 41.91 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "41d7212c-52ef-4902-8688-35e1028999e8")
+	)
+	(hierarchical_label "Output"
+		(shape input)
+		(at 53.34 41.91 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "54f38109-0ab1-4424-a721-39f54e1561d6")
+	)
+	(sheet
+		(at 36.83 40.64)
+		(size 16.51 3.81)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "43309e94-da5c-42ac-b628-860cda9a2a94")
+		(property "Sheetname" "nType"
+			(at 36.83 39.9284 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "../nType/nType.kicad_sch"
+			(at 36.83 45.0346 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "Output" input
+			(at 53.34 41.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "1a2283b2-edb9-4c99-9ec6-680ede138376")
+		)
+		(pin "Input" input
+			(at 36.83 41.91 180)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+			(uuid "6582284e-922d-4939-a49e-7cc51d604e15")
+		)
+		(instances
+			(project "Variants"
+				(path "/e0597968-f11c-42e6-8091-8a167b37e076"
+					(page "2")
+				)
+				(path "/e0597968-f11c-42e6-8091-8a167b37e076/86bc2818-09a8-4e11-a616-4bcb784038b9"
+					(page "4")
+				)
+			)
+		)
+	)
+)

@@ -29,14 +29,14 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         rootItem = self.treeApplyTo.GetRootItem()
         
         for subPcb in schData.subBoards.values():
-            if not subPcb.board:
-                invalidText = f"{subPcb._name} not found"
+            if not subPcb.isValid:
+                invalidText = f"{subPcb._name} INVALID!"
                 subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
                     parent=rootItem, text=invalidText, data=subPcb
                 )
                 continue
 
-            subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
+            subPcbItem: wx.TreeListItem = self.treeApplyTo.PrependItem(
                 parent=rootItem, text=str(subPcb._name), data=subPcb
             )
             checkState = wxStateFromTri(subPcb.getStateFromInstances())
@@ -50,7 +50,6 @@ class DlgHPCBRun(DlgHPCBRun_Base):
                     self.treeApplyTo.CheckItem(instanceItem)
             
             self.treeApplyTo.Expand(subPcbItem)
-
 
     def getSelectedSubPCB(self) -> Optional[SubPcb]:
         selItem = self.treeApplyTo.GetSelection()
@@ -69,16 +68,20 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         eventItem = event.GetItem()
         objData = self.treeApplyTo.GetItemData(eventItem)
         if isinstance(objData, SubPcb):
+
             # Toggle all children's state
             state = self.treeApplyTo.GetCheckedState(eventItem)
             self.treeApplyTo.CheckItemRecursively(eventItem, state)
+
             objData.setInstancesState(state == wx.CHK_CHECKED)
 
-        if isinstance(objData, PcbInstance):
+        elif isinstance(objData, PcbInstance):
+
             checked = self.treeApplyTo.GetCheckedState(eventItem)
             objData.enabled = (checked == wx.CHK_CHECKED)
 
             parent = self.treeApplyTo.GetItemParent(eventItem)
+
             parentSubpcb = self.treeApplyTo.GetItemData(parent)
             checkState = wxStateFromTri(parentSubpcb.getStateFromInstances())
             self.treeApplyTo.CheckItem(parent, checkState)

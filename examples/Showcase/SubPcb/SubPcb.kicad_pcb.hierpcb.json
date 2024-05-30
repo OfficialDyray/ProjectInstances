@@ -1,0 +1,26 @@
+{
+  "pType/pType.kicad_pcb": {
+    "selAnchor": "D1",
+    "enabledDict": {
+      "3003978c-fd0f-4020-b143-0f02e8f5a798": true
+    }
+  },
+  "nType/nType.kicad_pcb": {
+    "selAnchor": "D1",
+    "enabledDict": {
+      "6135ce1c-b744-4b77-ae78-eb08171e0e4b": true
+    }
+  },
+  "pTypeB/pTypeB.kicad_pcb": {
+    "selAnchor": "R1",
+    "enabledDict": {
+      "344ae87c-6489-4bd0-b0bd-ddf77e543a2a": true
+    }
+  },
+  "pTypeA/pTypeA.kicad_pcb": {
+    "selAnchor": "Q1",
+    "enabledDict": {
+      "de9269f9-2f9f-42b3-9740-982aa93457ec": true
+    }
+  }
+}
