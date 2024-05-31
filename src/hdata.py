@@ -221,7 +221,7 @@ class PcbInstance():
 
         fpTranslator = FootprintTranslator(self._mainSch.board, self._uuidPath)
 
-        # Find the anchor footprint on the subPCB:
+        # Find the anchor footprint on the PCBs:
         subPcbAnchor = self._SubPcb.anchorFootprint
         instanceAnchor = fpTranslator.getTarget(subPcbAnchor)
 

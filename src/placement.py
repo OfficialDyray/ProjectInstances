@@ -146,6 +146,13 @@ class ReplicateContext(PositionTransform, GroupManager):
         return self._targetBoard
 
 
+def footprintInBounds(footprint: pcbnew.FOOTPRINT):
+    fpPosition: pcbnew.VECTOR2I = footprint.GetPosition()
+    #If x or y is negative, a footprint is out of bounds
+    if fpPosition.x < 0 or fpPosition.y < 0:
+        return False
+    return True
+
 def clear_volatile_items(group: pcbnew.PCB_GROUP):
     """Remove all Traces, Drawings, Zones in a group."""
     board = group.GetBoard()
@@ -165,6 +172,7 @@ def clear_volatile_items(group: pcbnew.PCB_GROUP):
         if isinstance(item.Cast(), itemTypesToRemove):
             # Remove every drawing
             board.RemoveNative(item)
+
 
 def copy_footprint_fields(
     sourceFootprint: pcbnew.FOOTPRINT,
@@ -294,8 +302,10 @@ def enforce_position_footprints(
 
     # For each footprint in the sub-PCB, find the corresponding footprint on the board:
     for sourceFootprint in context.sourceBoard.GetFootprints():
-        # Find the corresponding footprint on the board:
+        if not footprintInBounds(sourceFootprint):
+            continue
 
+        # Find the corresponding footprint on the board:
         targetFootprint = fpTranslator.getTarget(sourceFootprint)
 
         if not targetFootprint:
