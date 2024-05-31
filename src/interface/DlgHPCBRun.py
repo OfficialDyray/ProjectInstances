@@ -96,11 +96,14 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         subPcb = self.getSelectedSubPCB()
         self.anchorChoice.Clear()
 
-        if subpcb is None:
+        if subPcb is None:
+            logger.warn("Selected Subpcb returned none")
             return
         if not subPcb.isValid:
+            logger.debug(f"invalid subPcb selected {subPcb._name}")
             return
 
+        logger.debug(f"subPcb selected {subPcb._name} with {len(subPcb.validAnchors)} anchors")
         self.anchorChoice.AppendItems(subPcb.validAnchors)
         if subPcb.selectedAnchor in subPcb.validAnchors:
             self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))

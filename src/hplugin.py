@@ -36,19 +36,19 @@ class ProjectInstancesPlugin(pcbnew.ActionPlugin):
     def Run(self):
         # grab PCB editor frame
         wx_frame = wx.FindWindowByName("PcbFrame")
+        boardPath = Path(pcbnew.GetBoard().GetFileName())
 
         for lH in list(logger.handlers):
             logger.removeHandler(lH)
         logger.addHandler(
-            logging.FileHandler(filename=pcbnew.GetBoard().GetFileName() + ".hierpcb.log", mode="w")
+            logging.FileHandler(filename=boardPath.with_suffix(".projinst.log"), mode="w")
         )
 
         # set up logger
         logger.info(
             f"Plugin v{self.version} running on KiCad {pcbnew.GetBuildVersion()} and Python {sys.version} on {sys.platform}."
         )
-
-        with ConfigMan(Path(pcbnew.GetBoard().GetFileName() + ".hierpcb.json")) as cfg:
+        with ConfigMan(boardPath.with_suffix(".projinst.json")) as cfg:
             RunActual(cfg, wx_frame)
 
 

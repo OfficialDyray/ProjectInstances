@@ -76,17 +76,15 @@ class BaseSchData():
             
             boardData = cfg.get(subBoard._name)
             if not boardData:
-                print("boardData empty")
-                # Add error output
+                logger.warn("boardData empty")
                 continue
-            print(boardData)
 
             subBoard.selectedAnchor = boardData.get("selAnchor")
 
             for instance in subBoard._instances:
                 isEnabled = boardData.get("enabledDict").get(instance._uuid, None)
                 if isEnabled == None:
-                    print("isEnabled empty")
+                    logger.warn("isEnabled empty")
                     continue
                 instance._enabled = isEnabled
 
@@ -109,19 +107,19 @@ class SubPcb:
         self._brdPath = brdPath
 
         if not brdPath.exists():
-            print(f"{str(brdPath)} doesn't exist")
+            logger.warn(f"{str(brdPath)} doesn't exist")
             self._isValid = False
             return
 
         try:
             subBoard = pcbnew.LoadBoard(brdPath)
         except:
-            print(f"{str(brdPath)} Board file invalid")
+            logger.warn(f"{str(brdPath)} Board file invalid")
             self._isValid = False
             return
 
         if len(subBoard.GetFootprints()) < 1:
-            print(f"{str(brdPath)} Has no footprints")
+            logger.warn(f"{str(brdPath)} Has no footprints")
             self._isValid = False
             return
 
@@ -129,6 +127,7 @@ class SubPcb:
 
         self._board = subBoard
         self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
+        logger.debug(f"anchor count: {len(self._validAnchors)}")
         self.selectedAnchor = self._validAnchors[0]
 
         self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
@@ -161,7 +160,7 @@ class SubPcb:
             self._selectedAnchor = value
         else:
             self._selectedAnchor = self.validAnchors[0]
-            print("Not valid anchor: " + str(value))
+            logger.warn("Not valid anchor: " + str(value))
         
         self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
 
