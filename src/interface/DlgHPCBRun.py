@@ -95,8 +95,13 @@ class DlgHPCBRun(DlgHPCBRun_Base):
     def handleSelectionChange( self, event ):
         subPcb = self.getSelectedSubPCB()
         self.anchorChoice.Clear()
-        self.anchorChoice.AppendItems(subPcb.validAnchors)
 
+        if subpcb is None:
+            return
+        if not subPcb.isValid:
+            return
+
+        self.anchorChoice.AppendItems(subPcb.validAnchors)
         if subPcb.selectedAnchor in subPcb.validAnchors:
             self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))
 
@@ -106,15 +111,17 @@ class DlgHPCBRun(DlgHPCBRun_Base):
 
         if subpcb is None:
             return
+        if not subpcb.isValid:
+            return
 
         # Get the selected anchor:
         sel = self.anchorChoice.GetSelection()
-        selAnchor = subpcb.validAnchors[sel]
-
+        
         if sel == wx.NOT_FOUND:
             logger.warning("No anchor selected!")
             return
-
+        
+        selAnchor = subpcb.validAnchors[sel]
         subpcb.selectedAnchor = selAnchor
 
     def handleApply(self, event):

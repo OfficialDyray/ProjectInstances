@@ -10,6 +10,7 @@
 import wx
 import wx.xrc
 import wx.dataview
+import wx.adv
 
 ###########################################################################
 ## Class DlgHPCBRun_Base
@@ -46,6 +47,11 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 
 		bSizerMain.Add( self.anchorChoice, 0, wx.ALL, 5 )
 
+		bSizer2 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.m_hyperlink1 = wx.adv.HyperlinkCtrl( self, wx.ID_ANY, u"Help", u"https://github.com/OfficialDyray/ProjectInstances/blob/master/README.md", wx.DefaultPosition, wx.DefaultSize, wx.adv.HL_DEFAULT_STYLE )
+		bSizer2.Add( self.m_hyperlink1, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 5 )
+
 		m_sdbSizer1 = wx.StdDialogButtonSizer()
 		self.m_sdbSizer1Apply = wx.Button( self, wx.ID_APPLY )
 		m_sdbSizer1.AddButton( self.m_sdbSizer1Apply )
@@ -54,7 +60,10 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 		m_sdbSizer1.Realize();
 		m_sdbSizer1.SetMinSize( wx.Size( -1,50 ) )
 
-		bSizerMain.Add( m_sdbSizer1, 0, wx.EXPAND, 5 )
+		bSizer2.Add( m_sdbSizer1, 8, wx.ALIGN_RIGHT, 5 )
+
+
+		bSizerMain.Add( bSizer2, 0, wx.EXPAND, 5 )
 
 
 		self.SetSizer( bSizerMain )

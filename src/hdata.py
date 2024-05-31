@@ -113,8 +113,13 @@ class SubPcb:
             self._isValid = False
             return
 
-        subBoard = pcbnew.LoadBoard(brdPath)
-            
+        try:
+            subBoard = pcbnew.LoadBoard(brdPath)
+        except:
+            print(f"{str(brdPath)} Board file invalid")
+            self._isValid = False
+            return
+
         if len(subBoard.GetFootprints()) < 1:
             print(f"{str(brdPath)} Has no footprints")
             self._isValid = False
