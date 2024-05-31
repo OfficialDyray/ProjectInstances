@@ -11,11 +11,11 @@ logger = logging.getLogger("hierpcb")
 
 def wxStateFromTri(int):
     match int:
+        case -1:
+            return wx.CHK_UNDETERMINED
         case 0:
             return wx.CHK_UNCHECKED
         case 1:
-            return wx.CHK_UNDETERMINED
-        case 2:
             return wx.CHK_CHECKED
 
 class DlgHPCBRun(DlgHPCBRun_Base):
@@ -29,19 +29,22 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         rootItem = self.treeApplyTo.GetRootItem()
         
         for subPcb in schData.subBoards.values():
+            #Show invalid pcbs
             if not subPcb.isValid:
                 invalidText = f"{subPcb._name} INVALID!"
                 subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
                     parent=rootItem, text=invalidText, data=subPcb
                 )
                 continue
-
+            
+            #Add valid PCBs 
             subPcbItem: wx.TreeListItem = self.treeApplyTo.PrependItem(
                 parent=rootItem, text=str(subPcb._name), data=subPcb
             )
             checkState = wxStateFromTri(subPcb.getStateFromInstances())
             self.treeApplyTo.CheckItem(subPcbItem, checkState)
 
+            # Populate subpcb instances
             for instance in subPcb._instances:
                 instanceItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
                     parent=subPcbItem, text=instance._name, data=instance
@@ -50,6 +53,7 @@ class DlgHPCBRun(DlgHPCBRun_Base):
                     self.treeApplyTo.CheckItem(instanceItem)
             
             self.treeApplyTo.Expand(subPcbItem)
+
 
     def getSelectedSubPCB(self) -> Optional[SubPcb]:
         selItem = self.treeApplyTo.GetSelection()
@@ -67,19 +71,21 @@ class DlgHPCBRun(DlgHPCBRun_Base):
     def handleTreeCheck( self, event ):
         eventItem = event.GetItem()
         objData = self.treeApplyTo.GetItemData(eventItem)
+
         if isinstance(objData, SubPcb):
 
             # Toggle all children's state
             state = self.treeApplyTo.GetCheckedState(eventItem)
+            boolState = (state == wx.CHK_CHECKED)
+            objData.setInstancesState(boolState)
             self.treeApplyTo.CheckItemRecursively(eventItem, state)
 
-            objData.setInstancesState(state == wx.CHK_CHECKED)
-
         elif isinstance(objData, PcbInstance):
+            #Set Instance State
+            state = self.treeApplyTo.GetCheckedState(eventItem)
+            objData.enabled = (state == wx.CHK_CHECKED)
 
-            checked = self.treeApplyTo.GetCheckedState(eventItem)
-            objData.enabled = (checked == wx.CHK_CHECKED)
-
+            #Update parent tri state
             parent = self.treeApplyTo.GetItemParent(eventItem)
 
             parentSubpcb = self.treeApplyTo.GetItemData(parent)
@@ -90,6 +96,7 @@ class DlgHPCBRun(DlgHPCBRun_Base):
         subPcb = self.getSelectedSubPCB()
         self.anchorChoice.Clear()
         self.anchorChoice.AppendItems(subPcb.validAnchors)
+
         if subPcb.selectedAnchor in subPcb.validAnchors:
             self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))
 
@@ -102,13 +109,13 @@ class DlgHPCBRun(DlgHPCBRun_Base):
 
         # Get the selected anchor:
         sel = self.anchorChoice.GetSelection()
-        sel_anchor = subpcb.validAnchors[sel]
+        selAnchor = subpcb.validAnchors[sel]
 
         if sel == wx.NOT_FOUND:
             logger.warning("No anchor selected!")
             return
 
-        subpcb.selectedAnchor = sel_anchor
+        subpcb.selectedAnchor = selAnchor
 
     def handleApply(self, event):
         """Submit the form."""

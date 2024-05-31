@@ -18,13 +18,13 @@ import wx.dataview
 class DlgHPCBRun_Base ( wx.Dialog ):
 
 	def __init__( self, parent ):
-		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = u"HierarchicalPCB", pos = wx.DefaultPosition, size = wx.Size( 465,766 ), style = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER )
+		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = u"Project Instances", pos = wx.DefaultPosition, size = wx.Size( 465,766 ), style = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER )
 
 		self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
 
 		bSizerMain = wx.BoxSizer( wx.VERTICAL )
 
-		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Choose which sub-PCB layouts to apply:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Choose which project instances to import:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText1.Wrap( -1 )
 
 		bSizerMain.Add( self.m_staticText1, 0, wx.ALL, 5 )
@@ -34,7 +34,7 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 
 		bSizerMain.Add( self.treeApplyTo, 1, wx.ALL|wx.EXPAND, 5 )
 
-		self.m_staticText3 = wx.StaticText( self, wx.ID_ANY, u"Select Anchor", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText3 = wx.StaticText( self, wx.ID_ANY, u"Select Anchor:", wx.DefaultPosition, wx.DefaultSize, 0 )
 		self.m_staticText3.Wrap( -1 )
 
 		bSizerMain.Add( self.m_staticText3, 0, wx.ALL|wx.EXPAND|wx.RIGHT, 5 )
@@ -51,8 +51,6 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 		m_sdbSizer1.AddButton( self.m_sdbSizer1Apply )
 		self.m_sdbSizer1Cancel = wx.Button( self, wx.ID_CANCEL )
 		m_sdbSizer1.AddButton( self.m_sdbSizer1Cancel )
-		self.m_sdbSizer1Help = wx.Button( self, wx.ID_HELP )
-		m_sdbSizer1.AddButton( self.m_sdbSizer1Help )
 		m_sdbSizer1.Realize();
 		m_sdbSizer1.SetMinSize( wx.Size( -1,50 ) )
 

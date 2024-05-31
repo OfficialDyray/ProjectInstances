@@ -12,24 +12,23 @@ import wx
 from .cfgman import ConfigMan
 from .hdata import BaseSchData
 from .interface import DlgHPCBRun
-#from .placement import enforce_position
 
 logger = logging.getLogger("hierpcb")
 logger.setLevel(logging.DEBUG)
 
 
-class HierarchicalPCBPlugin(pcbnew.ActionPlugin):
+class ProjectInstancesPlugin(pcbnew.ActionPlugin):
     def __init__(self):
         super().__init__()
         self.version = "0.0.1"
 
     def defaults(self):
-        self.name = "HierarchicalPCB"
+        self.name = "ProjectInstances"
         self.category = "Layout"
         self.description = (
-            "True hierarchical layouts to go with the hierarchical schematics."
-            "You can define 'rooms' for different schematics throughout the hierarchy "
-            "and this plugin will enforce them on the PCB."
+            "Import the schematics and pcb layout of another kicad project."
+            "The schematics are imported through sheets, and pcb layout is"
+            "imported through the use of this plugin."
         )
         self.icon_file_name = str(Path(__file__).parent / "icon.png")
         self.show_toolbar_button = True

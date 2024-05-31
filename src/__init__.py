@@ -1,3 +1,3 @@
-from .hplugin import HierarchicalPCBPlugin
+from .hplugin import ProjectInstancesPlugin
 
-HierarchicalPCBPlugin().register()
+ProjectInstancesPlugin().register()

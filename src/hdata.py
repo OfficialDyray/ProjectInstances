@@ -60,29 +60,25 @@ class BaseSchData():
     def subBoards(self):
         return self._subBoards
 
+    @property
+    def validSubBoards(self):
+        return {key:value for key, value in self._subBoards.items() if value.isValid}
+
 
     def save(self, cfg: ConfigMan):
-        for subBoard in self.subBoards.values():
-            if not subBoard.isValid:
-                continue
-
+        for subBoard in self.validSubBoards.values():
             enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
             boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
-            print(boardData)
             cfg.set(subBoard._name, value=boardData)
 
     def load(self, cfg: ConfigMan):
-        for subBoard in self.subBoards.values():
-            if not subBoard.isValid:
-                continue
-
+        for subBoard in self.validSubBoards.values():
+            
             boardData = cfg.get(subBoard._name)
-
             if not boardData:
                 print("boardData empty")
                 # Add error output
                 continue
-
             print(boardData)
 
             subBoard.selectedAnchor = boardData.get("selAnchor")
@@ -96,26 +92,12 @@ class BaseSchData():
 
 
     def replicate(self):
-        for subBoard in self.subBoards.values():
-            if not subBoard.isValid:
-                continue
+        for subBoard in self.validSubBoards.values():
             subBoard.replicateInstances()
 
         #Fixes issues with traces lingering after being deleted
         pcbnew.Refresh()
 
-# SubPcb:
-#   (sub)board              # If null, no valid pcb found
-#   (sub)schematic          # the source schematic of instances
-#
-#   validAnchors: {identifier: UUID path}
-#   selectedAnchor: UUID path             # Set by using fields?
-#   anchorFootprint
-#
-#   pcbInstances:  [instance]
-#
-#   saves/loads
-#   board file: selected anchor
 
 class SubPcb:
     def __init__(self, mainSch, relPath, instanceList):
@@ -145,8 +127,6 @@ class SubPcb:
         self.selectedAnchor = self._validAnchors[0]
 
         self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
-
-        
 
         self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
 
@@ -178,10 +158,10 @@ class SubPcb:
             self._selectedAnchor = self.validAnchors[0]
             print("Not valid anchor: " + str(value))
         
-        self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)        
+        self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
 
 
-    # Tri-state: 0- none, 1- some, 2- all
+    # Tri-state: -1 undefined, 0- none, 1- all
     def getStateFromInstances(self):
         if not self.board:
             return 0
@@ -191,50 +171,36 @@ class SubPcb:
         for instance in self._instances:
             if instance.enabled:
                 enabledCount += 1
-
+        
         if enabledCount == 0:
             return 0 # No instances enabled
-
-        if enabledCount == instanceNum:
-            return 2 # All instances enabled
-
-        return 1 # Some Instances enabled
+        elif enabledCount == instanceNum:
+            return 1 # All instances enabled
+        else:
+            return -1 # Some Instances enabled
 
     def setInstancesState(self, checked):
         for instance in self._instances:
             instance.enabled = checked
 
+
     def replicateInstances(self):
-        if not self.board:
+        if not self.isValid:
             return
+
         for instance in self._instances:
             if not instance.enabled:
                 continue
             instance.replicateLayout()
 
 
-# PcbInstance:
-# enabled
-#
-# UUID
-# UUID Path
-#
-# Transform
-# GroupManager
-#
-# When looping through instances,
-# the sub sheet can also be provided
-#
-# saves/loads the properties:
-#   sheet uuid: bool
-
 class PcbInstance():
-    def __init__(self, mainSch, SubPcb, instance):
-        uuid = instance["uuid"]
+    def __init__(self, mainSch, SubPcb, instanceDict):
+        uuid = instanceDict["uuid"]
         self._uuid = uuid
         self._uuidPath = "/" + uuid
 
-        name = instance["property"]["Sheetname"]
+        name = instanceDict["property"]["Sheetname"]
         self._name = name
 
         self._mainSch = mainSch
