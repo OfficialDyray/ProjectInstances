@@ -164,21 +164,25 @@ class SubPcb:
         
         self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
 
+    @property 
+    def instances(self):
+        return self._instances
+
+    @property
+    def enabledInstances(self):
+        return [instance for instance in self._instances if instance.enabled]
 
     # Tri-state: -1 undefined, 0- none, 1- all
     def getStateFromInstances(self):
-        if not self.board:
+        if not self.isValid:
             return 0
-        enabledCount = 0
-        instanceNum  = len(self._instances)
-
-        for instance in self._instances:
-            if instance.enabled:
-                enabledCount += 1
         
-        if enabledCount == 0:
+        instanceNum  = len(self.instances)
+        enabledNum   = len(self.enabledInstances)
+        
+        if instanceNum == 0:
             return 0 # No instances enabled
-        elif enabledCount == instanceNum:
+        elif enabledNum == instanceNum:
             return 1 # All instances enabled
         else:
             return -1 # Some Instances enabled

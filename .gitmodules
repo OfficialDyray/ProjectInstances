@@ -1,6 +1,3 @@
 [submodule "src/sexpdata"]
 	path = src/sexpdata
 	url = https://github.com/jd-boyd/sexpdata.git
-[submodule "src/pyparsing"]
-	path = src/pyparsing
-	url = https://github.com/pyparsing/pyparsing.git

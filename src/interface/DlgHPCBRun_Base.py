@@ -25,13 +25,8 @@ class DlgHPCBRun_Base ( wx.Dialog ):
 
 		bSizerMain = wx.BoxSizer( wx.VERTICAL )
 
-		self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Choose which project instances to import:", wx.DefaultPosition, wx.DefaultSize, 0 )
-		self.m_staticText1.Wrap( -1 )
-
-		bSizerMain.Add( self.m_staticText1, 0, wx.ALL, 5 )
-
 		self.treeApplyTo = wx.dataview.TreeListCtrl( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.dataview.TL_3STATE|wx.dataview.TL_CHECKBOX )
-		self.treeApplyTo.AppendColumn( u"Column1", wx.COL_WIDTH_DEFAULT, wx.ALIGN_LEFT, 0 )
+		self.treeApplyTo.AppendColumn( u"Choose which project instances to import:", wx.COL_WIDTH_DEFAULT, wx.ALIGN_LEFT, 0 )
 
 		bSizerMain.Add( self.treeApplyTo, 1, wx.ALL|wx.EXPAND, 5 )
 
