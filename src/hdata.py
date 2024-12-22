@@ -10,120 +10,211 @@ import wx
 
 logger = logging.getLogger("hierpcb")
 
-# MainSchData:
-#   Parse functions
-#
-#   (main)Board
-#   (main)Schematic
-#
-#   UUID
-#   UUID Path
-#
-#   [SubPcb]
+def sch_from_brd_path(brdPath):
+    return brdPath.with_suffix(".kicad_sch")
+def brd_from_sch_path(schPath):
+    return schPath.with_suffix(".kicad_pcb")
 
-class BaseSchData():
-    def __init__(self, baseBoard: pcbnew.BOARD):
+# For every subsheet in a sheet, we need to check if it has a pcb,
+# if it does, the search ends there, the pcb is added to the list. 
+# If not, it isnt in the list and, 
+# we need to search every sub-sheet the same as step 1.
+
+
+# A board always has a sheet
+# A sheet doesn't always have a board
+class SheetFile():
+    def __init__(self, sheetPath: Path):
         
-        if type(baseBoard) != pcbnew.BOARD:
-            raise ValueError("Didn't get type: pcbnew.BOARD")
+        if not isinstance(sheetPath, Path) :
+            raise ValueError(f"Didn't get type pathlib.Path, instead got: {type(sheetPath)}")
 
-        self._board = baseBoard
-
-        schematicPath = Path(baseBoard.GetFileName()).with_suffix(".kicad_sch")
-
-        if not schematicPath.exists():
+        if not sheetPath.exists():
             raise FileNotFoundError("Base Board Sch. not found: " + str(schematicPath))
-
-        schematicPath = schematicPath.resolve()
-        self._path = schematicPath
-        self.parsedSchematic = sch_parse_file(schematicPath)
         
-        sheetsByPcb = self._order_sheets_by_pcb(self.parsedSchematic.get("sheet", {}))
+        self._sheetPath = sheetPath.resolve()
+        self._sheet = sch_parse_file(sheetPath)
+        self._uuid = self._sheet.get("uuid")
+        self._boardPath = sheetPath.with_suffix(".kicad_pcb").resolve()
 
-        self._subBoards = { pcbPath : SubPcb(self, pcbPath, sheets) for pcbPath, sheets in sheetsByPcb.items()}
+        self._board = None
+        #Check Board Path
+        if not self._boardPath.exists():
+            logger.warn(f"{str(brdPath)} doesn't exist")
+            return
 
-    def _order_sheets_by_pcb(self, sheetList):
-        tempDict = {}
-        for subSheet in sheetList:
+        try:
+            tmpBoard = pcbnew.LoadBoard(str(self._boardPath))
+        except:
+            logger.warn(f"{str(self._boardPath)} Board file invalid")
+            return
 
-            tempDict.setdefault(subSheet["property"]["Sheetfile"], [])
-            
-            tempDict[subSheet["property"]["Sheetfile"]].append(subSheet)
-        
-        return tempDict
+        if len(tmpBoard.GetFootprints()) < 1:
+            logger.warn(f"{str(self._boardPath)} Has no footprints")
+            return
+
+        logger.info(f"Valid Board found for {sheetPath}")
+        self._board = tmpBoard
+
+        # self.anchorFootprint
+        # self.validAnchors
+        # self.selectedAnchor
+
+    def generate_subsheets(self, parentUUIDPath):
+
+        subsheetList = self._sheet.get("sheet", {})
+
+        logger.info(f"{len(subsheetList)} sheet instances entries in {self._sheetPath}")
+
+        # first organize all the sheets by file, so that
+        # sub sheets can share the same sheet data/pointer
+        sortSubsheets = {}
+        for subSheet in subsheetList:
+
+            absFile = self._sheetPath.parent / subSheet["property"]["Sheetfile"]
+
+            sortSubsheets.setdefault(absFile, [])
+            sortSubsheets[absFile].append(subSheet)
+
+        returnedList = []
+        for sheetFile, subSheetList in sortSubsheets.items():
+            sheetInfo = SheetFile(sheetFile)
+
+            for subSheet in subsheetList:
+                returnedList.append( SheetInstance(sheetInfo, subSheet, parentUUIDPath))
+
+        logger.info(f"{len(subsheetList)} subsheets found for {self._sheetPath}")
+        return returnedList
+
+    def makeRootSheet(self):
+        # The root board is gotten with pcbnew.GetBoard()
+        # This also makes the root act like a branch instead of leaf
+        self._board = None
+
+    def save(self, cfg: ConfigMan):
+        data = cfg.get("sheetByUUID")
+        data[self._uuid] = self.anchorRef
+        cfg.set("sheetByUUID", value=data)
+
+    def load(self, cfg: ConfigMan):
+        data = cfg.get("sheetByUUID")[self._uuid]
+
+        if not boardData:
+            logger.warn("boardData empty")
+            return
+
+        self.anchorRef = data
 
     @property
     def board(self):
         return self._board
 
-    @property
-    def subBoards(self):
-        return self._subBoards
+class SheetInstance():
+    def __init__(self, sheetData: SheetFile, subSheetDict: dict, parentUUIDPath: str):
+        self._sheet = sheetData
+        # Exclude the last two parameters if we are the root sheet.
+        # It doesn't have a uuid or parent
+        self._name = subSheetDict["property"]["Sheetname"]
+        self._uuid = subSheetDict["uuid"]
+        self._uuidPath = parentUUIDPath + "/" + self._uuid
 
-    @property
-    def validSubBoards(self):
-        return {key:value for key, value in self._subBoards.items() if value.isValid}
+        self._subSheets = sheetData.generate_subsheets(self._uuidPath)
 
+    # Tri-state: -1 undefined, 0- none, 1- all
+    def get_state(self):
+        # Returns a True False or Neither
+        if self._sheet.board:
+            # Is a true or false because leaf
+            return ConfigMan.get("enByUUID")[self._uuid]
 
-    def save(self, cfg: ConfigMan):
-        for subBoard in self.validSubBoards.values():
-            enabledDict = { instance._uuid: instance.enabled for instance in subBoard._instances}
-            boardData = {"selAnchor" : subBoard.selectedAnchor, "enabledDict": enabledDict}
-            cfg.set(subBoard._name, value=boardData)
+        return False
+        #Our state now depends entirely on children:
+        # Checked if all children are checked
+        # Semi-Checked if one child is checked
+        # UnChecked if all children are unchecked
+        #for subSheet in self._subSheets:
+        #    if subSheet.check_state():
+        #        continue
 
-    def load(self, cfg: ConfigMan):
-        for subBoard in self.validSubBoards.values():
+    def set_state(self, state: bool):
+        oldData = ConfigMan.get("enByUUID")
+        oldData[self._uuid] = state
+
+    def ancestorHasValidBoard(self):
+        if self._sheet.board:
+            #We are a valid board, return true
+            logger.info(f"Valid board for {self._uuid}")
+            return True
+
+        for subSheet in self._subSheets:
+            if subSheet.ancestorHasValidBoard():
+                logger.info(f"Valid child board for {self._uuid}")
+                return True
+
+        logger.info(f"No Valid Child board for {self._uuid}")
+        return False
             
-            boardData = cfg.get(subBoard._name)
-            if not boardData:
-                logger.warn("boardData empty")
-                continue
 
-            subBoard.selectedAnchor = boardData.get("selAnchor")
+    def applyChildren(self):
+        if self._sheet.board :
+            # Schematics with a board actually replicate
+            self.applyBoard()
+        else:
+            # Schematics without a board get a replicate signal
+            # That they pass up the tree
+            for subSheet in self._subSheets:
+                subSheet.applyChildren()
 
-            for instance in subBoard._instances:
-                isEnabled = boardData.get("enabledDict").get(instance._uuid, None)
-                if isEnabled == None:
-                    logger.warn("isEnabled empty")
-                    continue
-                instance._enabled = isEnabled
+    def applyBoard(self):
+        """Enforce the positions of objects in PCB template on PCB mutate."""
+        targetBoard = pcbnew.GetBoard()
+        sourceBoard = self._sheet.board
 
+        fpTranslator = FootprintTranslator(targetBoard, self._uuidPath)
 
-    def replicate(self):
-        for subBoard in self.validSubBoards.values():
-            subBoard.replicateInstances()
+        # TODO: Anchor on non-footprints?
+        # Alternatives to anchor footprint:
+        # Align centers: looses rotation
+        # Find the anchor footprint on the PCBs:
+        subPcbAnchor = sourceBoard.Footprints()[0]# self._sourceBoard.anchorFootprint
+        subSheetAnchor = fpTranslator.getTarget(subPcbAnchor)
+
+        if not subSheetAnchor:
+            return
+
+        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, subSheetAnchor, self._uuid)
+
+        # Clear Volatile items first
+        clear_volatile_items(replContext.group)
+
+        # First, move the footprints and create the net mapping:
+        netMap = enforce_position_footprints(replContext, fpTranslator)
+
+        # Recreate Volatile items:
+        copy_drawings(replContext)
+        copy_traces  (replContext, netMap)
+        copy_zones   (replContext, netMap) 
 
         #Fixes issues with traces lingering after being deleted
         pcbnew.Refresh()
 
+class RootInstance(SheetInstance):
+    def __init__(self, sheetFile: SheetFile):
+        sheetFile.makeRootSheet()
+        self._sheet = sheetFile
+        self._uuid = ""
+        self._uuidPath = ""
+        self._name = "Root"
 
-class SubPcb:
+        self._subSheets = sheetFile.generate_subsheets(self._uuidPath)
+
+
+
+
+
+"""
+class SubBoard:
     def __init__(self, mainSch, relPath, instanceList):
-        self._name = str(Path(relPath).with_suffix(".kicad_pcb"))
-        schPath = mainSch._path.parent / Path(relPath)
-        brdPath = schPath.with_suffix(".kicad_pcb")
-
-        self._schPath = schPath
-        self._brdPath = brdPath
-
-        if not brdPath.exists():
-            logger.warn(f"{str(brdPath)} doesn't exist")
-            self._isValid = False
-            return
-
-        try:
-            subBoard = pcbnew.LoadBoard(brdPath)
-        except:
-            logger.warn(f"{str(brdPath)} Board file invalid")
-            self._isValid = False
-            return
-
-        if len(subBoard.GetFootprints()) < 1:
-            logger.warn(f"{str(brdPath)} Has no footprints")
-            self._isValid = False
-            return
-
-        self._isValid = True
 
         self._board = subBoard
         self._validAnchors = [ fp.GetReferenceAsString() for fp in subBoard.GetFootprints() ]
@@ -131,25 +222,6 @@ class SubPcb:
         self.selectedAnchor = self._validAnchors[0]
 
         self.anchorFootprint = subBoard.FindFootprintByReference(self._selectedAnchor)
-
-        self._instances = [ PcbInstance(mainSch, self, instance) for instance in instanceList]
-
-
-    @property
-    def board(self):
-        return self._board
-
-    @property
-    def isValid(self):
-        return self._isValid
-
-    @property
-    def validAnchors(self):
-        return self._validAnchors
-
-    @property
-    def selectedAnchor(self):
-        return self._selectedAnchor
 
     @selectedAnchor.setter
     def selectedAnchor(self, value):
@@ -164,28 +236,9 @@ class SubPcb:
         
         self.anchorFootprint = self.board.FindFootprintByReference(self._selectedAnchor)
 
-    @property 
-    def instances(self):
-        return self._instances
-
     @property
     def enabledInstances(self):
         return [instance for instance in self._instances if instance.enabled]
-
-    # Tri-state: -1 undefined, 0- none, 1- all
-    def getStateFromInstances(self):
-        if not self.isValid:
-            return 0
-        
-        instanceNum  = len(self.instances)
-        enabledNum   = len(self.enabledInstances)
-        
-        if instanceNum == 0:
-            return 0 # No instances enabled
-        elif enabledNum == instanceNum:
-            return 1 # All instances enabled
-        else:
-            return -1 # Some Instances enabled
 
     def setInstancesState(self, checked):
         for instance in self._instances:
@@ -201,18 +254,17 @@ class SubPcb:
                 continue
             instance.replicateLayout()
 
-
-class PcbInstance():
-    def __init__(self, mainSch, SubPcb, instanceDict):
-        uuid = instanceDict["uuid"]
-        self._uuid = uuid
-        self._uuidPath = "/" + uuid
+def Tmp():
+    def tmp():
+        # The footprint has a uuid path, with the last uuid in the path
+        # being the footprint's uuid. The last uuid is always the same
+        # but the rest of the path changes between instances.
 
         name = instanceDict["property"]["Sheetname"]
         self._name = name
 
-        self._mainSch = mainSch
-        self._SubPcb = SubPcb
+        self._targetBoard = targetBoard
+        self._sourceBoard = sourceBoard
 
         self._enabled = False
 
@@ -223,28 +275,4 @@ class PcbInstance():
     @enabled.setter
     def enabled(self, value):
         self._enabled = value
-
-    def replicateLayout(self):
-        """Enforce the positions of objects in PCB template on PCB mutate."""
-
-        fpTranslator = FootprintTranslator(self._mainSch.board, self._uuidPath)
-
-        # Find the anchor footprint on the PCBs:
-        subPcbAnchor = self._SubPcb.anchorFootprint
-        instanceAnchor = fpTranslator.getTarget(subPcbAnchor)
-
-        if not instanceAnchor:
-            return
-
-        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, instanceAnchor, self._uuid)
-
-        # Clear Volatile items first
-        clear_volatile_items(replContext.group)
-
-        # First, move the footprints and create the net mapping:
-        netMap = enforce_position_footprints(replContext, fpTranslator)
-
-        # Recreate Volatile items:
-        copy_drawings(replContext)
-        copy_traces  (replContext, netMap)
-        copy_zones   (replContext, netMap)
+"""

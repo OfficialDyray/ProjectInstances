@@ -10,7 +10,9 @@ import pcbnew
 import wx
 
 from .cfgman import ConfigMan
-from .hdata import BaseSchData
+
+from .hdata import SheetFile,SheetInstance,RootInstance
+
 from .interface import DlgHPCBRun
 
 logger = logging.getLogger("hierpcb")
@@ -54,10 +56,15 @@ class ProjectInstancesPlugin(pcbnew.ActionPlugin):
 
 def RunActual(cfg, wx_frame: wx.Window):
 
-    schData = BaseSchData(pcbnew.GetBoard())
-    schData.load(cfg)
+    boardPath = Path(pcbnew.GetBoard().GetFileName())
+    sheetPath = boardPath.with_suffix(".kicad_sch")
 
-    if DlgHPCBRun(wx_frame, schData).ShowModal() == wx.ID_OK:
-        schData.save(cfg)
-        schData.replicate()
+    sheetFile = SheetFile(sheetPath)
+    rootInstance = RootInstance(sheetFile)
+
+    #RootInstance.load(cfg)
+
+    if DlgHPCBRun(wx_frame, rootInstance).ShowModal() == wx.ID_OK:
+        #rootInstance.save(cfg)
+        rootInstance.applyChildren()
         logger.info("Saved.")
