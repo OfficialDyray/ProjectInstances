@@ -91,26 +91,21 @@ class GroupManager:
             if group.GetName() == group_name:
                 retGroup = group
         if retGroup is None:
-            retGroup = pcbnew.PCB_GROUP(None)
+            retGroup = pcbnew.PCB_GROUP(self.board)
             retGroup.SetName(group_name)
             self.board.Add(retGroup)
         return retGroup
 
     def move(self, item: pcbnew.BOARD_ITEM) -> bool:
-        """Force an item to be in our group, returning True if the item was moved."""
-        moved = False
+        """Force an item to be in our group"""
         # First, check if the footprint is already in the group:
         parent_group = item.GetParentGroup()
         # If the footprint is not already in the group, remove it from the current group:
-        if parent_group and parent_group.GetName() != self.group.GetName():
-            moved = True
+        if parent_group:
             parent_group.RemoveItem(item)
-            parent_group = None
-        # If the footprint is not in any group, or was in the wrong group, add it to the right one:
-        if parent_group is None:
-            self.group.AddItem(item)
 
-        return moved
+        self.group.AddItem(item)
+        item.SetParentGroup(self.group)
 
 class FootprintTranslator:
     def __init__(self, searchBoard, searchPrefix):
@@ -131,7 +126,7 @@ class ReplicateContext(PositionTransform, GroupManager):
         ):
 
         self._sourceBoard = sourceAnchorFootprint.GetBoard()
-        self._targetBoard = targetAnchorFootprint.GetBoard()
+        self._targetBoard = pcbnew.GetBoard()
 
         PositionTransform.__init__(self, sourceAnchorFootprint, targetAnchorFootprint)
 

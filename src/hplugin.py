@@ -11,7 +11,7 @@ import wx
 
 from .cfgman import ConfigMan
 
-from .hdata import SheetFile,SheetInstance,RootInstance
+from .hdata import SheetFile,SheetInstance,RootInstance,sheetFileManager
 
 from .interface import DlgHPCBRun
 
@@ -50,6 +50,7 @@ class ProjectInstancesPlugin(pcbnew.ActionPlugin):
         logger.info(
             f"Plugin v{self.version} running on KiCad {pcbnew.GetBuildVersion()} and Python {sys.version} on {sys.platform}."
         )
+
         with ConfigMan(boardPath.with_suffix(".projinst.json")) as cfg:
             RunActual(cfg, wx_frame)
 
@@ -62,9 +63,13 @@ def RunActual(cfg, wx_frame: wx.Window):
     sheetFile = SheetFile(sheetPath)
     rootInstance = RootInstance(sheetFile)
 
-    #RootInstance.load(cfg)
+    sheetFileManager.load_file_data(cfg)
+    rootInstance.load(cfg)
 
     if DlgHPCBRun(wx_frame, rootInstance).ShowModal() == wx.ID_OK:
-        #rootInstance.save(cfg)
+
+        rootInstance.save(cfg)
+        sheetFileManager.save_file_data(cfg)
+
         rootInstance.applyChildren()
         logger.info("Saved.")

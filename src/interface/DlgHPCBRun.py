@@ -9,13 +9,11 @@ from .DlgHPCBRun_Base import DlgHPCBRun_Base
 
 logger = logging.getLogger("hierpcb")
 
-def wxStateFromTri(int):
-    match int:
-        case -1:
-            return wx.CHK_UNDETERMINED
-        case 0:
+def wxStateFromBool(inVal):
+    match inVal:
+        case False:
             return wx.CHK_UNCHECKED
-        case 1:
+        case True:
             return wx.CHK_CHECKED
 
 class DlgHPCBRun(DlgHPCBRun_Base):
@@ -25,29 +23,12 @@ class DlgHPCBRun(DlgHPCBRun_Base):
 
         rootItem = self.treeApplyTo.GetRootItem()
         logger.info(f"Root item: {rootItem}")
-        self.buildTreeFromSubSheet(rootInstance, rootItem)
+        self._buildTreeFromSubSheet(rootInstance, rootItem)
 
-            # #Show invalid pcbs
-            # if not subPcb.isValid:
-            #     invalidText = f"{subPcb._name} INVALID!"
-            #     subPcbItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
-            #         parent=rootItem, text=invalidText, data=subPcb
-            #     )
-            #     continue
-            
-            # # Populate subpcb instances
-            # for instance in subPcb._instances:
-            #     instanceItem: wx.TreeListItem = self.treeApplyTo.AppendItem(
-            #         parent=subPcbItem, text=instance._name, data=instance
-            #     )
-            #     if instance.enabled:
-            #         self.treeApplyTo.CheckItem(instanceItem)
-            
-            # self.treeApplyTo.Expand(subPcbItem)
-
-    def buildTreeFromSubSheet(self, sheetInstance , parentItem):
+    def _buildTreeFromSubSheet(self, sheetInstance , parentItem):
         if not sheetInstance.ancestorHasValidBoard():
             # Not a branch ending in a leaf, end recursion
+            # TODO: Add node anyways to help users know why it might not be working?
             logger.info(f"Instance is a dead branch: {sheetInstance._uuidPath}")
             return
 
@@ -56,98 +37,112 @@ class DlgHPCBRun(DlgHPCBRun_Base):
             logger.info(f"Instance is a leaf: {sheetInstance._uuidPath}")
 
             #Add leaf 
-            subSheetLeaf: wx.TreeListItem = self.treeApplyTo.PrependItem(
+            instanceLeaf: wx.TreeListItem = self.treeApplyTo.PrependItem(
                 parent=parentItem, text=str(sheetInstance._name), data=sheetInstance
             )
-            #checkState = wxStateFromTri(subPcb.getStateFromInstances())
-            #self.treeApplyTo.CheckItem(subPcbItem, checkState)
+            self.treeApplyTo.Expand(instanceLeaf)
+            checkState = wxStateFromBool(sheetInstance.enabled)
+            self.treeApplyTo.CheckItem(instanceLeaf, checkState)
+            self.treeApplyTo.UpdateItemParentStateRecursively(instanceLeaf)
             return
 
         # This subsheet is a branch
         logger.info(f"Instance is a branch: {sheetInstance._name}")
         # Add Branch
-        subSheetBranch: wx.TreeListItem = self.treeApplyTo.PrependItem(
+        instanceBranch: wx.TreeListItem = self.treeApplyTo.PrependItem(
             parent=parentItem, text=str(sheetInstance._name), data=sheetInstance
         )
+        self.treeApplyTo.Expand(instanceBranch)
         # Impliment branch checkbox later
         #checkState = wxStateFromTri(subPcb.getStateFromInstances())
         #self.treeApplyTo.CheckItem(subSheetBranch, checkState)
 
         # Populate with leaves/branches
         for sheetInstanceIt in sheetInstance._subSheets:
-            self.buildTreeFromSubSheet(sheetInstanceIt, subSheetBranch)
+            self._buildTreeFromSubSheet(sheetInstanceIt, instanceBranch)
 
-    # def getSelectedSubPCB(self) -> Optional[SubBoard]:
-    #     selItem = self.treeApplyTo.GetSelection()
-    #     instanceOrPcb = self.treeApplyTo.GetItemData(selItem)
+    def getSelectedInstance(self) -> Optional[SheetInstance]:
+        selItem = self.treeApplyTo.GetSelection()
+        instance = self.treeApplyTo.GetItemData(selItem)
 
-    #     subPcb = None
+        if not isinstance(instance, SheetInstance):
+            return None
 
-    #     if isinstance(instanceOrPcb, SheetInstance):
-    #         subPcb = instanceOrPcb._SubPcb
-    #     elif isinstance(instanceOrPcb, SubBoard):
-    #         subPcb = instanceOrPcb
-
-    #     return subPcb
+        return instance
 
     def handleTreeCheck( self, event ):
         eventItem = event.GetItem()
         objData = self.treeApplyTo.GetItemData(eventItem)
 
-        if isinstance(objData, SheetInstance):
-            if objData._sheet.board:
-                # Toggle all children's state
-                state = self.treeApplyTo.GetCheckedState(eventItem)
-                boolState = (state == wx.CHK_CHECKED)
-                objData.setInstancesState(boolState)
-            #self.treeApplyTo.CheckItemRecursively(eventItem, state)
+        if not isinstance(objData, SheetInstance):
+            return
 
-        #elif isinstance(objData, SheetInstance):
-            #Set Instance State
-            #state = self.treeApplyTo.GetCheckedState(eventItem)
-            #objData.enabled = (state == wx.CHK_CHECKED)
+        if objData._sheet.board:
+            # We are a leaf
+            state = self.treeApplyTo.GetCheckedState(eventItem)
+            boolState = (state == wx.CHK_CHECKED)
+            objData.enabled = boolState
 
-            #Update parent tri state
-            #parent = self.treeApplyTo.GetItemParent(eventItem)
+        else:
+            # A branch has changed, recursively apply to leaves
+            state = self.treeApplyTo.GetCheckedState(eventItem)
+            # This doesn't trigger a leaf change..
+            self.treeApplyTo.CheckItemRecursively(eventItem, state)
 
-            #parentSubpcb = self.treeApplyTo.GetItemData(parent)
-            #checkState = wxStateFromTri(parentSubpcb.getStateFromInstances())
-            #self.treeApplyTo.CheckItem(parent, checkState)
+            # Force sync the tree to instace data
+            self.syncTreeDataToInstances()
 
-    # def handleSelectionChange( self, event ):
-    #     subPcb = self.getSelectedSubPCB()
-    #     self.anchorChoice.Clear()
+        self.treeApplyTo.UpdateItemParentStateRecursively(eventItem)
 
-    #     if subPcb is None:
-    #         logger.warn("Selected Subpcb returned none")
-    #         return
-    #     if not subPcb.isValid:
-    #         logger.debug(f"invalid subPcb selected {subPcb._name}")
-    #         return
+    def syncTreeDataToInstances(self):
+        item = self.treeApplyTo.GetFirstItem()
+        while item.IsOk():
+            itemData =self.treeApplyTo.GetItemData(item) 
+            if not isinstance(itemData, SheetInstance):
+                item = self.treeApplyTo.GetNextItem(item)
+                continue
+            if not itemData._sheet.board:
+                item = self.treeApplyTo.GetNextItem(item)
+                continue
 
-    #     logger.debug(f"subPcb selected {subPcb._name} with {len(subPcb.validAnchors)} anchors")
-    #     self.anchorChoice.AppendItems(subPcb.validAnchors)
-    #     if subPcb.selectedAnchor in subPcb.validAnchors:
-    #         self.anchorChoice.SetSelection(subPcb.validAnchors.index(subPcb.selectedAnchor))
+            state = self.treeApplyTo.GetCheckedState(item) == wx.CHK_CHECKED
+            itemData.enabled = state
+            item = self.treeApplyTo.GetNextItem(item)
 
-    # def handleAnchorChange( self, event ):
-    #     # Set the anchor:
-    #     subpcb = self.getSelectedSubPCB()
+    def handleSelectionChange( self, event ):
+        self.anchorChoice.Clear()
 
-    #     if subpcb is None:
-    #         return
-    #     if not subpcb.isValid:
-    #         return
+        selInstance: SheetInstance = self.getSelectedInstance()
+        if selInstance is None:
+            logger.warn("Selected Subpcb returned none")
+            return
 
-    #     # Get the selected anchor:
-    #     sel = self.anchorChoice.GetSelection()
+        selSheetFile = selInstance.sheetFile
+        if not selSheetFile.board:
+            return 
+
+        logger.info(f"subPcb selected {selInstance._name} with {len(selSheetFile.fpByRef)} anchors")
+        self.anchorChoice.AppendItems(selSheetFile.fpByRef)
+        self.anchorChoice.SetSelection(selSheetFile.fpByRef.index(selSheetFile.anchorRef))
+
+    def handleAnchorChange( self, event ):
+        # Set the anchor:
+        selInstance: SheetInstance = self.getSelectedInstance()
+
+        if selInstance is None:
+            return
+
+        selSheetFile = selInstance.sheetFile
+        # Get the selected anchor:
+        sel = self.anchorChoice.GetSelection()
         
-    #     if sel == wx.NOT_FOUND:
-    #         logger.warning("No anchor selected!")
-    #         return
+        if sel == wx.NOT_FOUND:
+            logger.warning("No anchor selected!")
+            return
         
-    #     selAnchor = subpcb.validAnchors[sel]
-    #     subpcb.selectedAnchor = selAnchor
+        selAnchor = selSheetFile.fpByRef[sel]
+        logger.info(f"Anchor changed to {selAnchor} on {selSheetFile._sheetPath}")
+        selSheetFile.anchorRef = selAnchor
 
     def handleApply(self, event):
         """Submit the form."""
