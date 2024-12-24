@@ -1,14 +1,20 @@
 # Project Instances
-A simplified fork of [`HierarchicalPcb`](https://github.com/gauravmm/HierarchicalPcb) which was originally inspired by [`ReplicateLayout`](https://github.com/MitjaNemec/ReplicateLayout) plugin.
+A fork of [`HierarchicalPcb`](https://github.com/gauravmm/HierarchicalPcb) which was originally inspired by the [`ReplicateLayout`](https://github.com/MitjaNemec/ReplicateLayout) plugin.
 
 ## How To Use
 
 ### Create a sub-project:
-   1. Creating another (sub-)project inside your main project's folder.
-   2. Create your schematic and pcb in the sub-project like normal
-   3. Include the sub-project schematic in your Main Project
-   4. Prepare the board like you are about to lay it out.
-   5. Run the plugin on the main project's PCB to import the sub-project's PCB
+   1. Creating another (sub-)project inside your main project's folder. 
+
+Here is what the recommended folder structure looks like from the root project:
+![What the project tree looks like](https://github.com/OfficialDyray/ProjectInstances/blob/schParser/images/FolderStructure.png)
+
+   3. Create your schematic and pcb in the sub-project like normal
+   4. Include the sub-project schematic in your Main Project
+   5. Prepare the board like you are about to lay it out.
+   6. Run the plugin on the main project's PCB to import the sub-project's PCB
+
+![](https://github.com/OfficialDyray/ProjectInstances/blob/schParser/images/SideBySideHierarchy.png)
 
 ### Update an existing sub-project:
    1. Make your changes to the sub-project's schematic and pcb
@@ -19,8 +25,7 @@ A simplified fork of [`HierarchicalPcb`](https://github.com/gauravmm/Hierarchica
 [A Basic Example](examples/Basic)
 
 ## Tips
-   1. Footprints placed outside the top and left edges of the PCB in your sub-project are not updated.
-   2. Footprints deleted from the sub-project PCB are also not updated
+   1. It is intended to leave footprints out of a sub-board and they won't be laid out in the root project.
 
 ## Advanced Usage:
 ### [Nested Projects](examples/Nesting)
