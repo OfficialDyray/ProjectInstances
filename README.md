@@ -22,6 +22,10 @@ Here is what the recommended folder structure looks like from the root project:
    3. Update the pcb from your new schematics
    4. Run the plugin to apply the changes
 
+
+https://github.com/user-attachments/assets/78d0a88c-ed20-4e0c-ae54-b3dcbba4581b
+
+
 [A Basic Example](examples/Basic)
 
 ## Tips
