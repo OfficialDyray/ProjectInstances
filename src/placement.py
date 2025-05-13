@@ -179,23 +179,29 @@ def copy_footprint_fields(
     #       exact same as the original would when rotated.
 
     # Do any other field values need preserved?
+
+    if len(sourceFootprint.GetFields()) != len(targetFootprint.GetFields()):
+        logger.info("Number of footprint fields dont match")
+        return
+
     originalReference = targetFootprint.GetReference()
 
     # Remove Existing footprint fields
-    for existingField in targetFootprint.GetFields():
-        targetFootprint.RemoveNative(existingField)
-    
-    # Add all the source fields and move them
-    for sourceField in sourceFootprint.GetFields():
-        newField = sourceField.CloneField()
-        newField.SetParent(targetFootprint)
-        
-        newField.SetPosition(transform.translate(sourceField.GetPosition()))
-        newField.Rotate(newField.GetPosition(), transform.orient(pcbnew.ANGLE_0))
+    for targetField in targetFootprint.GetFields():
+        sourceField = sourceFootprint.GetFieldByName(
+            targetField.GetName()
+        )
+        if not sourceField:
+            logger.info("Field not found by name")
+            continue
 
-        targetFootprint.AddField(newField)
+        targetField.SetPosition(transform.translate(sourceField.GetPosition()))
+        targetField.SetTextAngle(
+            transform.orient(sourceField.GetTextAngle())
+        )
 
     targetFootprint.SetReference(originalReference)
+
 
 def copy_footprint_data(
     sourceFootprint: pcbnew.FOOTPRINT,
