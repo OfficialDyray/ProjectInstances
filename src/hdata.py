@@ -223,7 +223,7 @@ class SheetInstance():
         if not subSheetAnchor:
             return
 
-        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, subSheetAnchor, self._uuid)
+        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, subSheetAnchor, self._uuidPath)
 
         # Clear Volatile items first
         clear_volatile_items(replContext.group)
