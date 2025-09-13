@@ -12,23 +12,23 @@ def sch_list_to_dict(propertyList):
     for x in propertyList:
 
         # the first item in each list is the keyword used for matching
-        match str(x.pop(0)):
-            case "sheet":
-                buildingDict.setdefault("sheet", [])
+        item = str(x.pop(0))
 
-                sheetDict = sch_list_to_dict(x)
-                buildingDict["sheet"].append(sheetDict)
+        if item == "sheet":
+            buildingDict.setdefault("sheet", [])
+            sheetDict = sch_list_to_dict(x)
+            buildingDict["sheet"].append(sheetDict)
 
-            case "property":
-                buildingDict.setdefault("property", {})
+        elif item == "property":
+            buildingDict.setdefault("property", {})
 
-                sheetPropertyName = x.pop(0)
-                sheetPropertyValue = x.pop(0)
-                # otherData = sch_traverse(x) # Is just placement/format data
-                buildingDict["property"][sheetPropertyName] = sheetPropertyValue
-            
-            case "uuid":
-                buildingDict["uuid"] = x[0]
+            sheetPropertyName = x.pop(0)
+            sheetPropertyValue = x.pop(0)
+            # otherData = sch_traverse(x) # Is just placement/format data
+            buildingDict["property"][sheetPropertyName] = sheetPropertyValue  
+
+        elif item == "uuid":
+            buildingDict["uuid"] = x[0]
                 
             # Add more types later
 

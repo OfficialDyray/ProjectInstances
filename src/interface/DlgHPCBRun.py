@@ -10,11 +10,10 @@ from .DlgHPCBRun_Base import DlgHPCBRun_Base
 logger = logging.getLogger("hierpcb")
 
 def wxStateFromBool(inVal):
-    match inVal:
-        case False:
-            return wx.CHK_UNCHECKED
-        case True:
-            return wx.CHK_CHECKED
+    if inVal:
+        return wx.CHK_CHECKED
+    else:
+        return wx.CHK_UNCHECKED
 
 class DlgHPCBRun(DlgHPCBRun_Base):
     def __init__(self, parent: wx.Window, rootInstance: RootInstance):
