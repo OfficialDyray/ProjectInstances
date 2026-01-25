@@ -3,6 +3,10 @@ A fork of [`HierarchicalPcb`](https://github.com/gauravmm/HierarchicalPcb) which
 
 ## How To Use
 
+
+https://github.com/user-attachments/assets/78d0a88c-ed20-4e0c-ae54-b3dcbba4581b
+
+
 ### Create a sub-project:
    1. Creating another (sub-)project inside your main project's folder. 
 
@@ -21,9 +25,6 @@ Here is what the recommended folder structure looks like from the root project:
    2. Go to your main project and (re)annotate the sub-project's sheet.
    3. Update the pcb from your new schematics
    4. Run the plugin to apply the changes
-
-
-https://github.com/user-attachments/assets/78d0a88c-ed20-4e0c-ae54-b3dcbba4581b
 
 
 [A Basic Example](examples/Basic)
