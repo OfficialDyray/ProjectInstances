@@ -42,7 +42,11 @@ def sch_parse_file(schematicFile: Path) -> dict:
     if not schematicFile.exists():
         raise FileNotFoundError("Path not found: " + str(schematicFile))
 
-    with open(schematicFile) as file:
-        parsedList = sexpdata.load(file)
+    try:
+        with open(schematicFile, encoding="utf-8") as file:
+            parsedList = sexpdata.load(file)
+    except UnicodeDecodeError:
+        with open(schematicFile, encoding="latin-1") as file:
+            parsedList = sexpdata.load(file)
     parsedList.pop(0)
     return sch_list_to_dict(parsedList)
