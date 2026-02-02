@@ -48,7 +48,7 @@ class SheetFile():
             raise ValueError(f"Didn't get type pathlib.Path, instead got: {type(sheetPath)}")
 
         if not sheetPath.exists():
-            raise FileNotFoundError("Base Board Sch. not found: " + str(schematicPath))
+            raise FileNotFoundError("Base Board Sch. not found: " + str(sheetPath))
         
         self._sheetPath = sheetPath.resolve()
         self._sheet = sch_parse_file(sheetPath)
