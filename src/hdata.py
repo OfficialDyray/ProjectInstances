@@ -70,6 +70,10 @@ class SheetFile():
             logger.warn(f"{str(self._boardPath)} Board file invalid")
             return
 
+        if board is None:
+            logger.warn(f"{str(self._boardPath)} Board file could not be loaded")
+            return
+
         if len(board.GetFootprints()) < 1:
             logger.warn(f"{str(self._boardPath)} Has no footprints")
             return
