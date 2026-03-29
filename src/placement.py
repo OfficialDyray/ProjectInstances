@@ -263,6 +263,9 @@ def copy_traces(context: ReplicateContext, netMapping: dict):
         if type(newTrack) == pcbnew.PCB_VIA:
             newTrack.SetIsFree(False)
 
+        elif type(newTrack) == pcbnew.PCB_ARC:
+            newTrack.SetMid(context.translate(sourceTrack.GetMid()))
+
         context.move(newTrack)
 
 def copy_zones(context: ReplicateContext, netMapping: dict):
