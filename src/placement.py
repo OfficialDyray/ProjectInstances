@@ -142,11 +142,17 @@ class ReplicateContext(PositionTransform, GroupManager):
 
 
 def footprintInBounds(footprint: pcbnew.FOOTPRINT):
-    fpPosition: pcbnew.VECTOR2I = footprint.GetPosition()
-    #If x or y is negative, a footprint is out of bounds
-    if fpPosition.x < 0 or fpPosition.y < 0:
-        return False
-    return True
+    # Footprints outside the source board's Edge.Cuts outline are treated
+    # as intentionally parked and excluded from being laid out in the parent
+    # project. The previous heuristic (x<0 or y<0 == out of bounds) silently
+    # dropped any footprint placed in the negative coordinate quadrants,
+    # which broke layouts whose origin is centered on the board.
+    # If the source board has no Edge.Cuts defined, include all footprints.
+    board = footprint.GetBoard()
+    bbox = board.GetBoardEdgesBoundingBox()
+    if bbox.GetWidth() <= 0 or bbox.GetHeight() <= 0:
+        return True
+    return bbox.Contains(footprint.GetPosition())
 
 def clear_volatile_items(group: pcbnew.PCB_GROUP):
     """Remove all Traces, Drawings, Zones in a group."""
