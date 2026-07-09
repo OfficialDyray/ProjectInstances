@@ -154,14 +154,14 @@ def clear_volatile_items(group: pcbnew.PCB_GROUP):
 
     itemTypesToRemove = (
         # Traces
-        pcbnew.PCB_TRACK, pcbnew.ZONE,
+        pcbnew.PCB_TRACK, pcbnew.PCB_VIA, pcbnew.PCB_ARC,
         # Drawings
-        pcbnew.PCB_SHAPE, pcbnew.PCB_TEXT,
+        pcbnew.PCB_SHAPE, pcbnew.PCB_TEXT, pcbnew.PCB_DIMENSION_BASE,
         # Zones
         pcbnew.ZONE
     )
 
-    for item in group.GetItems():
+    for item in list(group.GetItems()):
 
         # Gets all drawings in a group
         if isinstance(item.Cast(), itemTypesToRemove):
@@ -188,9 +188,7 @@ def copy_footprint_fields(
 
     # Remove Existing footprint fields
     for targetField in targetFootprint.GetFields():
-        sourceField = sourceFootprint.GetFieldByName(
-            targetField.GetName()
-        )
+        sourceField = get_footprint_field_by_name(sourceFootprint, targetField.GetName())
         if not sourceField:
             logger.info("Field not found by name")
             continue
@@ -201,6 +199,19 @@ def copy_footprint_fields(
         )
 
     targetFootprint.SetReference(originalReference)
+
+
+def get_footprint_field_by_name(
+    footprint: pcbnew.FOOTPRINT,
+    fieldName: str
+):
+    if hasattr(footprint, "GetFieldByName"):
+        return footprint.GetFieldByName(fieldName)
+
+    if hasattr(footprint, "HasField") and not footprint.HasField(fieldName):
+        return None
+
+    return footprint.GetField(fieldName)
 
 
 def copy_footprint_data(
@@ -234,14 +245,45 @@ def copy_drawings(context: ReplicateContext):
         newDrawing = sourceDrawing.Duplicate()
         context.targetBoard.Add(newDrawing)
 
-        # Set New Position
-        newDrawing.SetPosition(context.translate(sourceDrawing.GetPosition()))
-
-        # Drawings dont have .SetOrientation()
-        # instead do a relative rotation
-        newDrawing.Rotate(newDrawing.GetPosition(), context.orient(pcbnew.ANGLE_0))
+        transform_drawing(sourceDrawing, newDrawing, context)
 
         context.move(newDrawing)
+
+
+def transform_drawing(
+    sourceDrawing: pcbnew.BOARD_ITEM,
+    targetDrawing: pcbnew.BOARD_ITEM,
+    transform: PositionTransform,
+):
+    if isinstance(targetDrawing.Cast(), pcbnew.PCB_DIMENSION_BASE):
+        transform_dimension(sourceDrawing, targetDrawing, transform)
+        return
+
+    # Move preserves compound drawing geometry; SetPosition jumbles dimensions.
+    targetDrawing.Move(transform.translate(sourceDrawing.GetPosition()) - sourceDrawing.GetPosition())
+
+    # Drawings dont have .SetOrientation()
+    # instead do a relative rotation
+    targetDrawing.Rotate(targetDrawing.GetPosition(), transform.orient(pcbnew.ANGLE_0))
+
+
+def transform_dimension(
+    sourceDimension: pcbnew.PCB_DIMENSION_BASE,
+    targetDimension: pcbnew.PCB_DIMENSION_BASE,
+    transform: PositionTransform,
+):
+    targetDimension.SetStart(transform.translate(sourceDimension.GetStart()))
+    targetDimension.SetEnd(transform.translate(sourceDimension.GetEnd()))
+
+    if hasattr(sourceDimension, "GetCrossbarStart") and hasattr(targetDimension, "UpdateHeight"):
+        targetDimension.UpdateHeight(
+            transform.translate(sourceDimension.GetCrossbarStart()),
+            transform.translate(sourceDimension.GetCrossbarEnd()),
+        )
+
+    targetDimension.SetTextPos(transform.translate(sourceDimension.GetTextPos()))
+    targetDimension.SetTextAngle(transform.orient(sourceDimension.GetTextAngle()))
+
 
 def copy_traces(context: ReplicateContext, netMapping: dict):
     for sourceTrack in context.sourceBoard.Tracks():
