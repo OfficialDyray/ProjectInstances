@@ -81,7 +81,7 @@ class SheetFile():
         # Default anchor as first footprint
         self._anchorRef = self.fpByRef[0]
 
-    def generate_subsheets(self, parentUUIDPath):
+    def generate_subsheets(self, parentUUIDPath, parentNamePath):
 
         sheetInstanceList = self._sheet.get("sheet", {})
 
@@ -95,7 +95,7 @@ class SheetFile():
 
             sheetInfo = sheetFileManager.get_file_by_path( sheetPath )
 
-            returnedList.append( SheetInstance(sheetInfo, instanceData, parentUUIDPath))
+            returnedList.append( SheetInstance(sheetInfo, instanceData, parentUUIDPath, parentNamePath))
 
         return returnedList
 
@@ -145,7 +145,13 @@ class SheetFile():
 
 
 class SheetInstance():
-    def __init__(self, sheetData: SheetFile, subSheetDict: dict, parentUUIDPath: str):
+    def __init__(
+        self,
+        sheetData: SheetFile,
+        subSheetDict: dict,
+        parentUUIDPath: str,
+        parentNamePath: str,
+    ):
         self._sheet = sheetData
         self._enabled = False
         # Exclude the last two parameters if we are the root sheet.
@@ -153,9 +159,10 @@ class SheetInstance():
         self._name = subSheetDict["property"]["Sheetname"]
         self._uuid = subSheetDict["uuid"]
         self._uuidPath = parentUUIDPath + "/" + self._uuid
+        self._namePath = parentNamePath + "/" + self._name
 
         if not sheetData.board:
-            self._subSheets = sheetData.generate_subsheets(self._uuidPath)
+            self._subSheets = sheetData.generate_subsheets(self._uuidPath, self._namePath)
 
     def ancestorHasValidBoard(self):
         if self._sheet.board:
@@ -223,7 +230,11 @@ class SheetInstance():
         if not subSheetAnchor:
             return
 
-        replContext: ReplicateContext = ReplicateContext(subPcbAnchor, subSheetAnchor, self._uuidPath)
+        replContext: ReplicateContext = ReplicateContext(
+            subPcbAnchor,
+            subSheetAnchor,
+            "subpcb_" + self._namePath,
+        )
 
         # Clear Volatile items first
         clear_volatile_items(replContext.group)
@@ -272,5 +283,6 @@ class RootInstance(SheetInstance):
         self._uuid = ""
         self._uuidPath = ""
         self._name = "Root"
+        self._namePath = self._name
 
-        self._subSheets = sheetFile.generate_subsheets(self._uuidPath)
+        self._subSheets = sheetFile.generate_subsheets(self._uuidPath, self._namePath)
